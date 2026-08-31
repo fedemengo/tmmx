@@ -1,0 +1,44 @@
+#!/bin/sh
+
+client_tty=$1
+. "$TMMX_DIR/scripts/common.sh"
+current_session=$(tmux display-message -p '#{session_name}')
+manager_host=$(tmmx_manager_host)
+local_sessions=$(tmux show-options -gqv @tmmx_manager_local_sessions)
+[ "$local_sessions" = host ] || local_sessions=all
+if [ "$local_sessions" = host ] && [ "$(tmux display-message -p '#{@tmmx_remote}')" != 1 ] && [ "$(tmux display-message -p '#{@tmmx_manager}')" != 1 ]; then local_sessions=none; fi
+result=$(tmmx_list_manager_sessions "$current_session" "$manager_host" "$local_sessions" | tmmx_fzf manager "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/kill-session.sh' {3}" || true)
+query=$(tmmx_query "$result")
+selected=$(tmmx_selection "$result")
+
+switch_to() {
+  if [ -n "$client_tty" ] && tmux list-clients -F '#{client_tty}' | grep -Fx "$client_tty" >/dev/null && tmux switch-client -c "$client_tty" -t "=$1"; then return 0; fi
+  tmux switch-client -t "=$1"
+}
+
+if [ -n "$selected" ]; then switch_to "$selected"; exit 0; fi
+[ -n "$query" ] || exit 0
+
+case "$query" in
+  @*)
+    host=${query#@}
+    case "$host" in ''|*[!A-Za-z0-9._-]*) tmux display-message 'Use @ followed by an SSH host alias'; exit 1 ;; esac
+    session=$(tmmx_find_remote "$host")
+    if [ -z "$session" ]; then
+      session=$(tmmx_remote_session_name "$host")
+      if ! tmmx_has_session "$session"; then tmux new-session -d -s "$session" "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/remote-connect.sh' '$host'"; fi
+      tmux set-option -t "=$session:" status off
+      tmux set-option -t "=$session:" mouse off
+      tmux set-option -t "=$session:" @tmmx_remote 1
+      tmux set-option -t "=$session:" @tmmx_host "$host"
+      tmmx_tag_managed "$session"
+    fi
+    switch_to "$session"
+    ;;
+  *)
+    if ! tmmx_valid_session_name "$query"; then tmux display-message 'Session names cannot contain tabs or |'; exit 1; fi
+    session=$(tmmx_session_name "$query")
+    if ! tmmx_has_session "$session"; then tmux new-session -d -s "$session"; tmmx_tag_managed "$session"; fi
+    switch_to "$session"
+    ;;
+esac

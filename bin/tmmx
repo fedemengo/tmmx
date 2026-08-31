@@ -1,0 +1,13 @@
+#!/bin/sh
+
+TMMX_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+if ! tmux has-session -t '=~tmmx' 2>/dev/null; then
+  tmux new-session -d -s '~tmmx'
+fi
+
+sh "$TMMX_DIR/tmmx.tmux"
+TMMX_DIR="$TMMX_DIR" sh "$TMMX_DIR/scripts/tag-sessions.sh"
+tmux set-option -t '=~tmmx:' @tmmx_manager 1
+tmux set-option -t '=~tmmx:' @tmmx_managed 1
+exec tmux attach-session -t '=~tmmx'
