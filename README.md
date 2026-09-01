@@ -75,3 +75,7 @@ The outer prefix is an additional tmux root binding. It opens the local prefix t
 - tmux normalizes `.` and `:` in session names to `_`; tmmx follows that rule.
 - New session names containing tabs or `|` are rejected because they cannot be represented safely in picker entries.
 - Set `TMMX_REMOTE_TMUX` in tmux’s server environment when a remote host needs an explicit tmux binary path.
+
+## Development
+
+Run the fast shell checks with `make test`. `make test-e2e` builds disposable Docker containers containing a real SSH server and tmux server, then verifies fresh-host creation and noisy remote shell output handling. Docker Compose is required for the E2E suite.

@@ -31,14 +31,15 @@ expected_manager_no_local=$(printf '@target-host\t30\ttime-30\tremote-wrapper')
 [ "$actual_manager_no_local" = "$expected_manager_no_local" ]
 
 [ "$(tmmx_selection "$(printf 'query\nlabel\ttime\ttarget')")" = target ]
-formatted=$(printf 'short\t100\ttime-1\ttarget-1\nlonger\t1\ttime-2\ttarget-2\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=30 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed $'s/\033\[[0-9;]*m//g')
+ansi_escape=$(printf '\033')
+formatted=$(printf 'short\t100\ttime-1\ttarget-1\nlonger\t1\ttime-2\ttarget-2\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=30 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
 expected_formatted=$(printf '%-16s\ttime-1\ttarget-1\n%-16s\ttime-2\ttarget-2' short longer)
 [ "$formatted" = "$expected_formatted" ]
 
-formatted_narrow=$(printf 'short\t100\ttime-1\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=15 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed $'s/\033\[[0-9;]*m//g')
+formatted_narrow=$(printf 'short\t100\ttime-1\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=15 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
 [ "$formatted_narrow" = "$(printf ' \ttime-1\ttarget-1')" ]
 
-formatted_tiny=$(printf 'long-session\t100\t2026-08-31 14:54\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=20 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed $'s/\033\[[0-9;]*m//g')
+formatted_tiny=$(printf 'long-session\t100\t2026-08-31 14:54\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=20 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
 [ "$formatted_tiny" = "$(printf '\t2026-08-31 14:54\ttarget-1')" ]
 
 [ "$(tmmx_remote_session_name db.internal)" = __tmmx_remote__db_internal ]

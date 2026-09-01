@@ -1,0 +1,21 @@
+services:
+  host:
+    build:
+      context: ./host
+    volumes:
+      - ${TMMX_E2E_KEYS_DIR}:/keys:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 22"]
+      interval: 1s
+      timeout: 1s
+      retries: 20
+
+  tester:
+    build:
+      context: ./tester
+    depends_on:
+      host:
+        condition: service_healthy
+    volumes:
+      - ../../:/src:ro
+      - ${TMMX_E2E_KEYS_DIR}:/keys:ro
