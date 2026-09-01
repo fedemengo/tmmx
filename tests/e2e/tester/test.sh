@@ -92,15 +92,17 @@ while [ "$attempt" -lt 100 ]; do
 done
 [ "$attached" = 1 ] || { kill "$recovery_pid" 2>/dev/null || true; wait "$recovery_pid" 2>/dev/null || true; cat /tmp/tmmx-e2e-recovery.log >&2; exit 1; }
 touch /signals/recovery-attached
+printf '%s\n' 'recovery test: host attached; waiting for crash' >&2
 attempt=0
 while [ ! -f /signals/host-restarted ] && [ "$attempt" -lt 200 ]; do attempt=$((attempt + 1)); sleep 0.1; done
 [ -f /signals/host-restarted ] || { kill "$recovery_pid" 2>/dev/null || true; wait "$recovery_pid" 2>/dev/null || true; cat /tmp/tmmx-e2e-recovery.log >&2; exit 1; }
+printf '%s\n' 'recovery test: host recreated; waiting for restore' >&2
 attached=0
 attempt=0
-while [ "$attempt" -lt 200 ]; do
+while [ "$attempt" -lt 60 ]; do
   if ssh host 'test -f /tmp/tmmx-e2e-restored && tmux list-clients -F "#{client_session}" | grep -qx restored'; then attached=1; break; fi
   attempt=$((attempt + 1))
-  sleep 0.1
+  sleep 1
 done
 [ "$attached" = 1 ] || { kill "$recovery_pid" 2>/dev/null || true; wait "$recovery_pid" 2>/dev/null || true; cat /tmp/tmmx-e2e-recovery.log >&2; exit 1; }
 touch /signals/recovery-complete
