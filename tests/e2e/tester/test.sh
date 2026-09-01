@@ -71,4 +71,40 @@ set -e
 [ "$status" -eq 0 ] || { cat /tmp/tmmx-e2e-exit.log >&2; exit 1; }
 ssh host '! tmux has-session -t =one-shot'
 
+# A host restart drops the SSH transport. The managed wrapper must stay alive,
+# restore the requested session once, and reattach after the controller restarts
+# the host container.
+tmux new-session -d -s tmmx-e2e-local
+tmux set-option -g @tmmx_auto_reconnect on
+tmux set-option -g @tmmx_reconnect_delay 1
+tmux set-option -g @tmmx_auto_restore on
+tmux set-option -g @tmmx_restore_grace 10
+ssh host 'tmux new-session -d -s restored "sleep 60"'
+rm -f /tmp/tmmx-e2e-fzf-calls
+TMMX_E2E_FZF_SESSION=restored PATH=/tmp/tmmx-e2e-bin:$PATH TMMX_DIR=/src script -q -c 'sh /src/scripts/remote-connect.sh host' /dev/null >/tmp/tmmx-e2e-recovery.log 2>&1 &
+recovery_pid=$!
+attached=0
+attempt=0
+while [ "$attempt" -lt 100 ]; do
+  if ssh host 'tmux list-clients -F "#{client_session}" | grep -qx restored'; then attached=1; break; fi
+  attempt=$((attempt + 1))
+  sleep 0.1
+done
+[ "$attached" = 1 ] || { kill "$recovery_pid" 2>/dev/null || true; wait "$recovery_pid" 2>/dev/null || true; cat /tmp/tmmx-e2e-recovery.log >&2; exit 1; }
+touch /signals/recovery-attached
+attempt=0
+while [ ! -f /signals/host-restarted ] && [ "$attempt" -lt 200 ]; do attempt=$((attempt + 1)); sleep 0.1; done
+[ -f /signals/host-restarted ] || { kill "$recovery_pid" 2>/dev/null || true; wait "$recovery_pid" 2>/dev/null || true; cat /tmp/tmmx-e2e-recovery.log >&2; exit 1; }
+attached=0
+attempt=0
+while [ "$attempt" -lt 200 ]; do
+  if ssh host 'test -f /tmp/tmmx-e2e-restored && tmux list-clients -F "#{client_session}" | grep -qx restored'; then attached=1; break; fi
+  attempt=$((attempt + 1))
+  sleep 0.1
+done
+[ "$attached" = 1 ] || { kill "$recovery_pid" 2>/dev/null || true; wait "$recovery_pid" 2>/dev/null || true; cat /tmp/tmmx-e2e-recovery.log >&2; exit 1; }
+touch /signals/recovery-complete
+kill "$recovery_pid" 2>/dev/null || true
+wait "$recovery_pid" 2>/dev/null || true
+
 printf '%s\n' 'tmmx E2E: fresh host and noisy shell passed'

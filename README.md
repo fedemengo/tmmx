@@ -62,11 +62,17 @@ set -g @tmmx_manager_picker_key 'w'
 set -g @tmmx_manager_local_sessions 'all' # or 'host' for one @local-host row
 set -g @tmmx_popup_width '60%'
 set -g @tmmx_popup_height '50%'
+set -g @tmmx_auto_reconnect 'off'
+set -g @tmmx_reconnect_delay 2
+set -g @tmmx_auto_restore 'off'
+set -g @tmmx_restore_grace 5
 set -g @tmmx_manager_host 'local-host'
 set -g @tmmx_host_colors 'personal-host=#a3be8c,work-host=#ff9e64'
 ```
 
 The outer prefix is an additional tmux root binding. It opens the local prefix table in local sessions and is forwarded unchanged through managed SSH wrappers.
+
+`@tmmx_auto_reconnect` retries a managed SSH connection after a network drop and uses a five-second SSH keepalive so a half-open connection is detected. With `@tmmx_auto_restore` enabled, a recovered host with no tmux server is bootstrapped and its configured `@resurrect-restore-script-path` is invoked before tmmx reattaches. Restore is attempted once per outage and waits up to `@tmmx_restore_grace` seconds for the requested session.
 
 `@tmmx_picker_spacing` controls the minimum number of spaces between the label and timestamp columns.
 
