@@ -1,0 +1,4 @@
+#!/bin/sh
+
+printf '%s\n' 'welcome-from-noisy-shell'
+exec /bin/sh "$@"

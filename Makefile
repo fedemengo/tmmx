@@ -1,6 +1,6 @@
 PREFIX ?= $(HOME)/.local
 
-.PHONY: install test
+.PHONY: install test test-e2e
 
 install:
 	install -d "$(PREFIX)/bin"
@@ -9,3 +9,6 @@ install:
 test:
 	sh -n tmmx.tmux bin/tmmx scripts/*.sh tests/test-common.sh
 	sh tests/test-common.sh
+
+test-e2e:
+	sh tests/e2e/run.sh

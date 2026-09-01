@@ -1,0 +1,20 @@
+name: E2E
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ssh-tmux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test
+      - run: TMMX_E2E_LOG="$RUNNER_TEMP/tmmx-e2e.log" make test-e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmmx-e2e-logs
+          path: ${{ runner.temp }}/tmmx-e2e.log
+          if-no-files-found: ignore

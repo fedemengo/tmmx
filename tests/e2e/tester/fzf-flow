@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -eu
+
+if [ "${1:-}" = --version ]; then printf '%s\n' '0.44.1'; exit 0; fi
+input=$(mktemp)
+trap 'rm -f "$input"' EXIT INT TERM
+cat >"$input"
+calls_file=/tmp/tmmx-e2e-fzf-calls
+calls=$(cat "$calls_file" 2>/dev/null || printf 0)
+calls=$((calls + 1))
+printf '%s\n' "$calls" >"$calls_file"
+if [ "$calls" -eq 1 ]; then
+  selected=$(awk -F '\t' '$3 == "one-shot" { print; exit }' "$input")
+  [ -n "$selected" ] || exit 1
+  printf '\n%s\n' "$selected"
+fi

@@ -1,0 +1,14 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shell:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh -n tmmx.tmux bin/tmmx scripts/*.sh tests/test-common.sh
+      - run: sh tests/test-common.sh
