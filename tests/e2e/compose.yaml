@@ -19,3 +19,4 @@ services:
     volumes:
       - ../../:/src:ro
       - ${TMMX_E2E_KEYS_DIR}:/keys:ro
+      - ${TMMX_E2E_SIGNALS_DIR}:/signals

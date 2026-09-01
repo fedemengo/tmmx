@@ -11,7 +11,7 @@ calls=$(cat "$calls_file" 2>/dev/null || printf 0)
 calls=$((calls + 1))
 printf '%s\n' "$calls" >"$calls_file"
 if [ "$calls" -eq 1 ]; then
-  selected=$(awk -F '\t' '$3 == "one-shot" { print; exit }' "$input")
+  selected=$(awk -F '\t' -v session="${TMMX_E2E_FZF_SESSION:-one-shot}" '$3 == session { print; exit }' "$input")
   [ -n "$selected" ] || exit 1
   printf '\n%s\n' "$selected"
 fi
