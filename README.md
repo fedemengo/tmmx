@@ -28,7 +28,7 @@ Install the plugin on remote hosts as well when you want `Ctrl-\ f`, clipboard f
 
 ## Controls
 
-- `Ctrl-q w`: open the manager picker. Type `name` for a local session or `@host` for an SSH-backed tmux session.
+- `Ctrl-q w`: open the manager picker. Type `name` for a local session, `@host` for an SSH-backed tmux session, or `ssh user@host` to connect as a specific SSH user.
 - `Ctrl-q Tab`: switch between the two most recently used manager sessions.
 - `Ctrl-\ f`: open a create-or-switch picker for the current tmux server.
 - `Ctrl-\ Space` or `Ctrl-\ Ctrl-Tab`: switch to the previous session on the current tmux server.
@@ -40,6 +40,10 @@ Pickers start in scroll mode: use `j` and `k` to navigate, `i` to type, and `Ctr
 ## Remote workflow
 
 Typing `@target-host` in the manager creates a local wrapper session, connects with `ssh target-host`, and lets you select or create a tmux session on that host. Ending the inner remote session returns to that host’s picker; `Esc` returns to the local manager.
+
+`@host` connects as the user configured for that host in your SSH configuration. To connect as a different user without adding an SSH alias, type `ssh user@host` instead. tmmx creates the same kind of wrapper session, connects with `ssh user@host`, and shows the same host session picker. The complete destination is kept for the wrapper's lifetime, so reconnect, restore, and remote kill all use it. `@host` and `ssh user@host` are separate entries in the manager: the first appears as `@host` and the second as `user@host`. `ssh host` without a user is equivalent to `@host`.
+
+The `Host` entry in your SSH configuration still applies when connecting as `user@host`; the command-line user only overrides `User`. Keys, `ProxyJump`, and other options from that entry are used as usual, so no per-user alias is needed.
 
 Use SSH `ProxyJump` for hosts behind a jump host. tmmx then keeps the interactive workflow at two tmux layers.
 
@@ -73,6 +77,10 @@ set -g @tmmx_host_colors 'personal-host=#a3be8c,work-host=#ff9e64'
 The outer prefix is an additional tmux root binding. It opens the local prefix table in local sessions and is forwarded unchanged through managed SSH wrappers.
 
 `@tmmx_auto_reconnect` retries a managed SSH connection after a network drop and uses a five-second SSH keepalive so a half-open connection is detected. With `@tmmx_auto_restore` enabled, a recovered host with no tmux server is bootstrapped and its configured `@resurrect-restore-script-path` is invoked before tmmx reattaches. Restore is attempted once per outage and waits up to `@tmmx_restore_grace` seconds for the requested session.
+
+Automatic reconnect and restore are reliable only when SSH authentication is non-interactive: an agent-loaded key, an unprotected key, or a key whose passphrase is already cached. This applies equally to `@host` and `ssh user@host` targets, and the key can come from the host's `Host` entry. A password or passphrase prompt during a reconnect attempt blocks the wrapper until it is answered.
+
+`@tmmx_host_colors` keys can be a host alias or a complete `user@host` destination. A `user@host` entry matches only that destination, and a host alias also colors every `user@host` destination for that host.
 
 `@tmmx_picker_spacing` controls the minimum number of spaces between the label and timestamp columns.
 

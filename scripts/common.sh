@@ -30,17 +30,35 @@ tmmx_manager_host() {
   printf '%s\n' "$manager_host"
 }
 
+tmmx_ssh_host() { printf '%s\n' "${1##*@}"; }
+tmmx_ssh_user() { case "$1" in *@*) printf '%s\n' "${1%@*}" ;; *) printf '\n' ;; esac; }
+tmmx_ssh_command_destination() {
+  case "$1" in ssh|'ssh '*) printf '%s\n' "${1#ssh}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' ;; *) return 1 ;; esac
+}
+tmmx_valid_ssh_destination() { case "$1" in ''|*[!A-Za-z0-9._@-]*|@*|*@|*@*@*) return 1 ;; *) return 0 ;; esac; }
+
+tmmx_host_color() {
+  destination=$1
+  colors=$(tmux show-options -gqv @tmmx_host_colors)
+  for key in "$destination" "$(tmmx_ssh_host "$destination")"; do
+    color=$(printf '%s\n' "$colors" | tr ',' '\n' | awk -v key="$key" 'index($0, key "=") == 1 { print substr($0, length(key) + 2); exit }')
+    if [ -n "$color" ]; then printf '%s\n' "$color"; return 0; fi
+  done
+  return 1
+}
+
 tmmx_host_label() {
-  host=$1
-  color=$(tmux show-options -gqv @tmmx_host_colors | tr ',' '\n' | while IFS='=' read -r key value; do [ "$key" = "$host" ] && { printf '%s\n' "$value"; break; }; done)
-  hex=$(printf '%s' "$color" | sed -n 's/^#\([0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]\)$/\1/p')
+  destination=$1
+  user=$(tmmx_ssh_user "$destination")
+  if [ -n "$user" ]; then text=$destination; else text="@$destination"; fi
+  hex=$(tmmx_host_color "$destination" | sed -n 's/^#\([0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]\)$/\1/p')
   if [ -n "$hex" ]; then
     red=$(printf '%d' "0x$(printf '%s' "$hex" | cut -c1-2)")
     green=$(printf '%d' "0x$(printf '%s' "$hex" | cut -c3-4)")
     blue=$(printf '%d' "0x$(printf '%s' "$hex" | cut -c5-6)")
-    printf '\033[38;2;%s;%s;%sm@%s\033[0m' "$red" "$green" "$blue" "$host"
+    printf '\033[38;2;%s;%s;%sm%s\033[0m' "$red" "$green" "$blue" "$text"
   else
-    printf '@%s' "$host"
+    printf '%s' "$text"
   fi
 }
 

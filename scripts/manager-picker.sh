@@ -16,24 +16,37 @@ switch_to() {
   tmux switch-client -t "=$1"
 }
 
+# destination is a complete SSH destination ([user@]host). It is stored verbatim
+# in @tmmx_host so reconnect, restore, and kill all reuse the same target.
+connect_remote() {
+  destination=$1
+  session=$(tmmx_find_remote "$destination")
+  if [ -z "$session" ]; then
+    session=$(tmmx_remote_session_name "$destination")
+    if ! tmmx_has_session "$session"; then tmux new-session -d -s "$session" "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/remote-connect.sh' '$destination'"; fi
+    tmux set-option -t "=$session:" status off
+    tmux set-option -t "=$session:" mouse off
+    tmux set-option -t "=$session:" @tmmx_remote 1
+    tmux set-option -t "=$session:" @tmmx_host "$destination"
+    tmmx_tag_managed "$session"
+  fi
+  switch_to "$session"
+}
+
 if [ -n "$selected" ]; then switch_to "$selected"; exit 0; fi
 [ -n "$query" ] || exit 0
+
+if destination=$(tmmx_ssh_command_destination "$query"); then
+  if ! tmmx_valid_ssh_destination "$destination"; then tmux display-message 'Use ssh user@host'; exit 1; fi
+  connect_remote "$destination"
+  exit 0
+fi
 
 case "$query" in
   @*)
     host=${query#@}
-    case "$host" in ''|*[!A-Za-z0-9._-]*) tmux display-message 'Use @ followed by an SSH host alias'; exit 1 ;; esac
-    session=$(tmmx_find_remote "$host")
-    if [ -z "$session" ]; then
-      session=$(tmmx_remote_session_name "$host")
-      if ! tmmx_has_session "$session"; then tmux new-session -d -s "$session" "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/remote-connect.sh' '$host'"; fi
-      tmux set-option -t "=$session:" status off
-      tmux set-option -t "=$session:" mouse off
-      tmux set-option -t "=$session:" @tmmx_remote 1
-      tmux set-option -t "=$session:" @tmmx_host "$host"
-      tmmx_tag_managed "$session"
-    fi
-    switch_to "$session"
+    case "$host" in ''|*[!A-Za-z0-9._-]*) tmux display-message 'Use @ followed by an SSH host alias, or ssh user@host'; exit 1 ;; esac
+    connect_remote "$host"
     ;;
   *)
     if ! tmmx_valid_session_name "$query"; then tmux display-message 'Session names cannot contain tabs or |'; exit 1; fi

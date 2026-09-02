@@ -47,6 +47,17 @@ set -e
 case "$status" in 124|137) ;; *) cat /tmp/tmmx-e2e-existing.log >&2; exit 1 ;; esac
 ssh host 'tmux has-session -t =later'
 
+# An explicit user@host destination reuses the Host entry's key and reaches the
+# same tmux server, so the existing session is selected instead of duplicated.
+set +e
+FZF_DEFAULT_OPTS='--filter=later' timeout -k 2 5 script -q -c 'TMMX_DIR=/src sh /src/scripts/remote-connect.sh tmmx@host' /dev/null >/tmp/tmmx-e2e-user.log 2>&1
+status=$?
+set -e
+case "$status" in 124|137) ;; *) cat /tmp/tmmx-e2e-user.log >&2; exit 1 ;; esac
+sessions=$(ssh host 'tmux list-sessions -F "__TMMX_SESSION__#{session_name}"' | sed -n 's/^__TMMX_SESSION__//p' | sort)
+[ "$sessions" = 'later
+main' ]
+
 # A normally ending remote session must return to the host picker. This small
 # fzf driver accepts one-shot on its first call and cancels the next picker.
 # Wait until it has a real SSH client, then end it to avoid a timing race.
