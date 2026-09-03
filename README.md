@@ -43,7 +43,9 @@ Typing `@target-host` in the manager creates a local wrapper session, connects w
 
 `@host` connects as the user configured for that host in your SSH configuration. To connect as a different user without adding an SSH alias, type `ssh user@host` instead. tmmx creates the same kind of wrapper session, connects with `ssh user@host`, and shows the same host session picker. The complete destination is kept for the wrapper's lifetime, so reconnect, restore, and remote kill all use it. `@host` and `ssh user@host` are separate entries in the manager: the first appears as `@host` and the second as `user@host`. `ssh host` without a user is equivalent to `@host`.
 
-The `Host` entry in your SSH configuration still applies when connecting as `user@host`; the command-line user only overrides `User`. Keys, `ProxyJump`, and other options from that entry are used as usual, so no per-user alias is needed.
+The `Host` entry in your SSH configuration still applies when connecting as `user@host`; the command-line user only overrides `User`. Keys, `ProxyJump`, and other options from that entry are used as usual, so no per-user alias is needed. tmmx always runs its own command over SSH, so `RemoteCommand` and `RequestTTY` from a matching entry are overridden.
+
+If the connection fails before the host picker appears, for example because the name does not resolve or tmux is missing on the host, the wrapper shows the error and waits for Enter before closing.
 
 Use SSH `ProxyJump` for hosts behind a jump host. tmmx then keeps the interactive workflow at two tmux layers.
 

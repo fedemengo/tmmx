@@ -11,6 +11,15 @@ Host host
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   LogLevel ERROR
+Host host-alias
+  HostName host
+  User nobody-else
+  IdentityFile /keys/id_ed25519
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  LogLevel ERROR
+  RequestTTY force
+  RemoteCommand exec /bin/sh -i
 EOF
 chmod 600 /root/.ssh/config
 
@@ -54,6 +63,17 @@ FZF_DEFAULT_OPTS='--filter=later' timeout -k 2 5 script -q -c 'TMMX_DIR=/src sh 
 status=$?
 set -e
 case "$status" in 124|137) ;; *) cat /tmp/tmmx-e2e-user.log >&2; exit 1 ;; esac
+sessions=$(ssh host 'tmux list-sessions -F "__TMMX_SESSION__#{session_name}"' | sed -n 's/^__TMMX_SESSION__//p' | sort)
+[ "$sessions" = 'later
+main' ]
+
+# A Host entry whose User, RemoteCommand, and RequestTTY would each defeat tmmx:
+# the explicit user replaces User, and tmmx overrides the other two itself.
+set +e
+FZF_DEFAULT_OPTS='--filter=later' timeout -k 2 5 script -q -c 'TMMX_DIR=/src sh /src/scripts/remote-connect.sh tmmx@host-alias' /dev/null >/tmp/tmmx-e2e-alias.log 2>&1
+status=$?
+set -e
+case "$status" in 124|137) ;; *) cat /tmp/tmmx-e2e-alias.log >&2; exit 1 ;; esac
 sessions=$(ssh host 'tmux list-sessions -F "__TMMX_SESSION__#{session_name}"' | sed -n 's/^__TMMX_SESSION__//p' | sort)
 [ "$sessions" = 'later
 main' ]
