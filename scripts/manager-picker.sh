@@ -47,7 +47,8 @@ fi
 case "$query" in
   @*)
     host=${query#@}
-    case "$host" in ''|*[!A-Za-z0-9._-]*) tmux display-message 'Use @ followed by an SSH host alias, or ssh user@host'; exit 1 ;; esac
+    case "$host" in *@*) host= ;; esac
+    if ! tmmx_valid_ssh_destination "$host"; then tmux display-message 'Use @ followed by an SSH host alias, or ssh user@host'; exit 1; fi
     connect_remote "$host"
     ;;
   *)

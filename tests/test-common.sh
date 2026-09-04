@@ -42,9 +42,19 @@ formatted_narrow=$(printf 'short\t100\ttime-1\ttarget-1\n' | TMMX_NOW=100 TMMX_P
 formatted_tiny=$(printf 'long-session\t100\t2026-08-31 14:54\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=20 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
 [ "$formatted_tiny" = "$(printf '\t2026-08-31 14:54\ttarget-1')" ]
 
-[ "$(tmmx_remote_session_name db.internal)" = __tmmx_remote__db_internal ]
-[ "$(tmmx_remote_session_name db:internal)" = __tmmx_remote__db_internal ]
-[ "$(tmmx_remote_session_name deploy@db.internal)" = __tmmx_remote__deploy@db_internal ]
+[ "$(tmmx_remote_session_name legion3)" = __tmmx_remote__legion3 ]
+[ "$(tmmx_remote_session_name fmengozzi@legion3)" = __tmmx_remote__fmengozzi@legion3 ]
+[ "$(tmmx_remote_session_name db.internal)" = __tmmx_remote__db_dinternal ]
+[ "$(tmmx_remote_session_name db:internal)" = __tmmx_remote__db_cinternal ]
+[ "$(tmmx_remote_session_name deploy@db.internal)" = __tmmx_remote__deploy@db_dinternal ]
+# Injective: destinations that tmux would fold together stay distinct, and the
+# encoding round-trips so restored sessions recover their destination.
+[ "$(tmmx_remote_session_name first.last@host)" != "$(tmmx_remote_session_name first_last@host)" ]
+[ "$(tmmx_remote_session_name a_d@host)" != "$(tmmx_remote_session_name a.@host)" ]
+for destination in legion3 fmengozzi@legion3 first.last@host first_last@host a_d@host a.@host x__y:z.w a_dd a._ _._; do
+  [ "$(tmmx_decode_destination "$(tmmx_encode_destination "$destination")")" = "$destination" ]
+done
+[ "$(tmmx_decode_destination db_internal)" = db_internal ]
 [ "$(tmmx_session_name web.dev)" = web_dev ]
 tmmx_valid_session_name plain-name
 ! tmmx_valid_session_name "$(printf 'bad|name')"
@@ -70,6 +80,12 @@ tmmx_valid_ssh_destination target-host
 ! tmmx_valid_ssh_destination deploy@jump@target-host
 ! tmmx_valid_ssh_destination 'deploy@target-host -p 2222'
 ! tmmx_valid_ssh_destination "deploy@target-host'; rm -rf /"
+! tmmx_valid_ssh_destination -v
+! tmmx_valid_ssh_destination -o
+! tmmx_valid_ssh_destination -lroot
+! tmmx_valid_ssh_destination -lroot@target-host
+! tmmx_valid_ssh_destination deploy@-target-host
+tmmx_valid_ssh_destination deploy@target-host-2
 [ "$(tmmx_ssh_user deploy@target-host)" = deploy ]
 [ "$(tmmx_ssh_user target-host)" = '' ]
 [ "$(tmmx_ssh_host deploy@target-host)" = target-host ]

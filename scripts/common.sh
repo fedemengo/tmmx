@@ -36,7 +36,9 @@ tmmx_ssh_user() { case "$1" in *@*) printf '%s\n' "${1%@*}" ;; *) printf '\n' ;;
 tmmx_ssh_command_destination() {
   case "$1" in ssh|'ssh '*) printf '%s\n' "${1#ssh}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' ;; *) return 1 ;; esac
 }
-tmmx_valid_ssh_destination() { case "$1" in ''|*[!A-Za-z0-9._@-]*|@*|*@|*@*@*) return 1 ;; *) return 0 ;; esac; }
+# [user@]host: allowed characters only, at most one @, and neither part may start
+# with - because the destination is passed to ssh as an argument.
+tmmx_valid_ssh_destination() { case "$1" in ''|*[!A-Za-z0-9._@-]*|@*|*@|*@*@*|-*|*@-*) return 1 ;; *) return 0 ;; esac; }
 
 tmmx_host_color() {
   destination=$1
@@ -194,7 +196,12 @@ tmmx_selection() { printf '%s\n' "$1" | sed -n '2p' | cut -f3-; }
 tmmx_has_session() { tmux has-session -t "=$1" 2>/dev/null; }
 tmmx_tag_managed() { tmux set-option -t "=$1:" @tmmx_managed 1; }
 tmmx_session_name() { printf '%s\n' "$(printf '%s' "$1" | tr '.:' '__')"; }
-tmmx_remote_session_name() { printf '__tmmx_remote__%s\n' "$(tmmx_session_name "$1")"; }
+# tmux rewrites . and : in session names to _, which would make first.last@host
+# and first_last@host share a wrapper. This encoding is injective: _ becomes __,
+# . becomes _d and : becomes _c, so every destination has its own session name.
+tmmx_encode_destination() { printf '%s\n' "$1" | sed 's/_/__/g; s/\./_d/g; s/:/_c/g'; }
+tmmx_decode_destination() { printf '%s\n' "$1" | awk -v mark="$(printf '\001')" '{ gsub(/__/, mark); gsub(/_d/, "."); gsub(/_c/, ":"); gsub(mark, "_"); print }'; }
+tmmx_remote_session_name() { printf '__tmmx_remote__%s\n' "$(tmmx_encode_destination "$1")"; }
 tmmx_valid_session_name() { forbidden=$(printf '\t|'); [ -n "$1" ] && [ "$(printf '%s' "$1" | tr -d "$forbidden")" = "$1" ]; }
 tmmx_no_server_error() { grep -Eq 'no server running|error connecting to .*No such file or directory'; }
 
