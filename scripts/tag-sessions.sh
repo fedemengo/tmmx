@@ -1,12 +1,13 @@
 #!/bin/sh
 
+. "$TMMX_DIR/scripts/common.sh"
 tmux list-sessions -F '#{session_name}' | while IFS= read -r session; do
   tmux set-option -t "=$session:" @tmmx_managed 1
   case "$session" in
     __tmmx_remote__*|__remote__*)
       tmux set-option -t "=$session:" @tmmx_remote 1
       case "$session" in
-        __tmmx_remote__*) host=${session#__tmmx_remote__} ;;
+        __tmmx_remote__*) host=$(tmmx_decode_destination "${session#__tmmx_remote__}") ;;
         __remote__*) host=${session#__remote__} ;;
       esac
       existing_host=$(tmux show-option -t "=$session:" -qv @tmmx_host)

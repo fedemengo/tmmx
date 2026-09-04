@@ -7,6 +7,7 @@ tmmx_list_sessions() {
     [ "$session" = "$current_session" ] && continue
     [ "$manager" = 1 ] && continue
     timestamp=$(tmmx_format_timestamp "$last_attached")
+    last_attached=${last_attached:-0}
     if [ "$remote" = 1 ]; then printf '@%s\t%s\t%s\t%s\n' "$host" "$last_attached" "$timestamp" "$session"; else printf '%s\t%s\t%s\t%s\n' "$session" "$last_attached" "$timestamp" "$session"; fi
   done
 }
@@ -30,17 +31,37 @@ tmmx_manager_host() {
   printf '%s\n' "$manager_host"
 }
 
+tmmx_ssh_host() { printf '%s\n' "${1##*@}"; }
+tmmx_ssh_user() { case "$1" in *@*) printf '%s\n' "${1%@*}" ;; *) printf '\n' ;; esac; }
+tmmx_ssh_command_destination() {
+  case "$1" in ssh|'ssh '*) printf '%s\n' "${1#ssh}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' ;; *) return 1 ;; esac
+}
+# [user@]host: allowed characters only, at most one @, and neither part may start
+# with - because the destination is passed to ssh as an argument.
+tmmx_valid_ssh_destination() { case "$1" in ''|*[!A-Za-z0-9._@-]*|@*|*@|*@*@*|-*|*@-*) return 1 ;; *) return 0 ;; esac; }
+
+tmmx_host_color() {
+  destination=$1
+  colors=$(tmux show-options -gqv @tmmx_host_colors)
+  for key in "$destination" "$(tmmx_ssh_host "$destination")"; do
+    color=$(printf '%s\n' "$colors" | tr ',' '\n' | awk -v key="$key" 'index($0, key "=") == 1 { print substr($0, length(key) + 2); exit }')
+    if [ -n "$color" ]; then printf '%s\n' "$color"; return 0; fi
+  done
+  return 1
+}
+
 tmmx_host_label() {
-  host=$1
-  color=$(tmux show-options -gqv @tmmx_host_colors | tr ',' '\n' | while IFS='=' read -r key value; do [ "$key" = "$host" ] && { printf '%s\n' "$value"; break; }; done)
-  hex=$(printf '%s' "$color" | sed -n 's/^#\([0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]\)$/\1/p')
+  destination=$1
+  user=$(tmmx_ssh_user "$destination")
+  if [ -n "$user" ]; then text=$destination; else text="@$destination"; fi
+  hex=$(tmmx_host_color "$destination" | sed -n 's/^#\([0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]\)$/\1/p')
   if [ -n "$hex" ]; then
     red=$(printf '%d' "0x$(printf '%s' "$hex" | cut -c1-2)")
     green=$(printf '%d' "0x$(printf '%s' "$hex" | cut -c3-4)")
     blue=$(printf '%d' "0x$(printf '%s' "$hex" | cut -c5-6)")
-    printf '\033[38;2;%s;%s;%sm@%s\033[0m' "$red" "$green" "$blue" "$host"
+    printf '\033[38;2;%s;%s;%sm%s\033[0m' "$red" "$green" "$blue" "$text"
   else
-    printf '@%s' "$host"
+    printf '%s' "$text"
   fi
 }
 
@@ -67,17 +88,65 @@ tmmx_list_manager_sessions() {
   done
 }
 
+# Hosts declared in an OpenSSH client configuration, in file order, following
+# Include directives. Patterns with wildcards or negation are not connectable,
+# and only aliases that are valid destinations on their own are offered.
+tmmx_ssh_config_hosts() {
+  tmmx_ssh_config_scan "${1:-$HOME/.ssh/config}" 0 | awk '!seen[$0]++' | while IFS= read -r alias; do
+    case "$alias" in *@*) continue ;; esac
+    tmmx_valid_ssh_destination "$alias" && printf '%s\n' "$alias"
+  done
+}
+tmmx_ssh_config_scan() {
+  config_file=$1
+  depth=$2
+  [ -r "$config_file" ] && [ "$depth" -lt 8 ] || return 0
+  awk '{ sub(/#.*/, ""); key = tolower($1); if (key == "host") { for (i = 2; i <= NF; i++) if ($i !~ /[*?!]/) print "host\t" $i } else if (key == "include") { for (i = 2; i <= NF; i++) print "include\t" $i } }' "$config_file" | while IFS="$(printf '\t')" read -r kind value; do
+    case "$kind" in
+      host) printf '%s\n' "$value" ;;
+      include)
+        case "$value" in '~/'*) value="$HOME/${value#\~/}" ;; /*) ;; *) value="$HOME/.ssh/$value" ;; esac
+        for included in $value; do tmmx_ssh_config_scan "$included" $((depth + 1)); done
+        ;;
+    esac
+  done
+}
+
+# Manager rows for a query: matching sessions, then, once the query names an SSH
+# destination (@host or user@host), configured hosts that have no wrapper yet. Host rows carry an ssh: target so the picker connects instead of switching.
+tmmx_list_manager_candidates() {
+  current_session=$1
+  manager_host=$2
+  local_sessions=$3
+  query=$4
+  tmmx_list_manager_sessions "$current_session" "$manager_host" "$local_sessions"
+  case "$query" in *@*) user=${query%%@*} ;; *) return 0 ;; esac
+  case "$user" in *[!A-Za-z0-9._-]*) return 0 ;; esac
+  [ -n "$user" ] && user="$user@"
+  existing=$(tmmx_list_sessions '' | cut -f1 | sed -n 's/^@//p')
+  tmmx_ssh_config_hosts | while IFS= read -r host; do
+    destination="$user$host"
+    tmmx_valid_ssh_destination "$destination" || continue
+    printf '%s\n' "$existing" | grep -Fqx "$destination" && continue
+    printf '%s\t0\tssh config\tssh:%s\n' "$(tmmx_host_label "$destination")" "$destination"
+  done
+}
+
+tmmx_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+
 tmmx_fzf() {
   picker_kind=$1
   kill_command=$2
+  reload_command=$3
   case "$picker_kind" in
-    manager) title='Hosts'; footer='Ctrl-x close · Ctrl-j scroll · i insert · Esc cancel' ;;
-    remote) title='Sessions'; footer='Ctrl-x kill · Ctrl-j scroll · i insert · Esc cancel' ;;
-    *) title='Sessions'; footer='Ctrl-x kill · Ctrl-j scroll · i insert · Esc cancel' ;;
+    manager) title='Hosts'; footer='Ctrl-x close · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
+    remote) title='Sessions'; footer='Ctrl-x kill · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
+    *) title='Sessions'; footer='Ctrl-x kill · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
   esac
   fzf_version=$(fzf --version 2>/dev/null | sed -n '1{s/[^0-9.].*$//;p;}')
-  if ! awk -v version="$fzf_version" 'BEGIN { split(version, part, "."); exit !(part[1] > 0 || (part[1] == 0 && part[2] >= 35)) }'; then
-    message="tmmx requires fzf 0.35 or newer (found ${fzf_version:-none})"
+  # transform-query and put(...) need fzf 0.36.
+  if ! awk -v version="$fzf_version" 'BEGIN { split(version, part, "."); exit !(part[1] > 0 || (part[1] == 0 && part[2] >= 36)) }'; then
+    message="tmmx requires fzf 0.36 or newer (found ${fzf_version:-none})"
     printf '%s\n' "$message" >&2
     tmux display-message "$message" 2>/dev/null || true
     return 2
@@ -88,6 +157,8 @@ tmmx_fzf() {
   case "$picker_columns" in ''|*[!0-9]*) picker_columns=${COLUMNS:-} ;; esac
   case "$picker_columns" in ''|*[!0-9]*) picker_columns=$(tput cols 2>/dev/null || printf 0) ;; esac
   case "$picker_columns" in ''|*[!0-9]*) picker_columns=0 ;; esac
+  reload_binding=
+  [ -n "$reload_command" ] && reload_binding=",change:reload($reload_command {q} | TMMX_PICKER_COLUMNS=$picker_columns sh $(tmmx_quote "$TMMX_DIR/scripts/format-picker.sh"))"
   if awk -v version="$fzf_version" 'BEGIN { split(version, part, "."); exit !(part[1] > 0 || (part[1] == 0 && part[2] >= 63)) }'; then
     TMMX_PICKER_COLUMNS="$picker_columns" "$TMMX_DIR/scripts/format-picker.sh" | tmmx_run_fzf "$title" 1 --border-label=" $title [scroll] " --footer="$footer"
   else
@@ -96,12 +167,36 @@ tmmx_fzf() {
   fi
 }
 
+# Pickers start in a strict scroll mode: every printable key is ignored except
+# the movement keys, i (insert mode) and @ (insert mode with @ already typed).
+# Ctrl-j returns to scroll mode. fzf's action parser cannot take ) ] } > inside
+# one list, so those closers get their own calls with other delimiters.
+tmmx_fzf_key_list() { awk 'BEGIN { for (i = 33; i <= 126; i++) { c = sprintf("%c", i); if (index(")]}>", c) == 0) printf "%s%s", (n++ ? "," : ""), c } print ",space" }'; }
+tmmx_fzf_mode_action() { printf '%s(%s)+%s{),],>}+%s(})' "$1" "$(tmmx_fzf_key_list)" "$1" "$1"; }
+
 tmmx_run_fzf() {
   title=$1
   dynamic_title=$2
   shift 2
-  if [ "$dynamic_title" = 1 ]; then mode_bindings="i:unbind(j,k,i)+change-border-label( $title [insert] ),start:change-border-label( $title [scroll] ),ctrl-j:rebind(j,k,i)+change-border-label( $title [scroll] )"; else mode_bindings='i:unbind(j,k,i),ctrl-j:rebind(j,k,i)'; fi
-  fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2 --tabstop=1 --print-query --bind "j:down,k:up,$mode_bindings,enter:accept$kill_binding" "$@"
+  insert_mode=$(tmmx_fzf_mode_action unbind)
+  scroll_mode=$(tmmx_fzf_mode_action rebind)
+  if [ "$dynamic_title" = 1 ]; then
+    insert_mode="$insert_mode+change-border-label( $title [insert] )"
+    scroll_mode="$scroll_mode+change-border-label( $title [scroll] )"
+    start_binding=",start:change-border-label( $title [scroll] )"
+  else
+    start_binding=
+  fi
+  code=33
+  while [ "$code" -le 126 ]; do
+    key=$(printf "\\$(printf '%03o' "$code")")
+    case "$key" in j|k|g|G|i|@) ;; *) set -- "$@" --bind "$key:ignore" ;; esac
+    code=$((code + 1))
+  done
+  fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2 --tabstop=1 --print-query \
+    --bind "j:down,k:up,g:first,G:last,ctrl-d:half-page-down,ctrl-u:half-page-up,ctrl-f:page-down,ctrl-b:page-up,enter:accept$kill_binding$reload_binding$start_binding" \
+    --bind "tab:transform-query(printf %s {1} | sed 's/[[:space:]]*\$//')" \
+    --bind "i:$insert_mode" --bind "@:$insert_mode+put(@)" --bind "ctrl-j:$scroll_mode" --bind 'space:ignore' "$@"
 }
 
 tmmx_query() { printf '%s\n' "$1" | sed -n '1p'; }
@@ -109,7 +204,12 @@ tmmx_selection() { printf '%s\n' "$1" | sed -n '2p' | cut -f3-; }
 tmmx_has_session() { tmux has-session -t "=$1" 2>/dev/null; }
 tmmx_tag_managed() { tmux set-option -t "=$1:" @tmmx_managed 1; }
 tmmx_session_name() { printf '%s\n' "$(printf '%s' "$1" | tr '.:' '__')"; }
-tmmx_remote_session_name() { printf '__tmmx_remote__%s\n' "$(tmmx_session_name "$1")"; }
+# tmux rewrites . and : in session names to _, which would make first.last@host
+# and first_last@host share a wrapper. This encoding is injective: _ becomes __,
+# . becomes _d and : becomes _c, so every destination has its own session name.
+tmmx_encode_destination() { printf '%s\n' "$1" | sed 's/_/__/g; s/\./_d/g; s/:/_c/g'; }
+tmmx_decode_destination() { printf '%s\n' "$1" | awk -v mark="$(printf '\001')" '{ gsub(/__/, mark); gsub(/_d/, "."); gsub(/_c/, ":"); gsub(mark, "_"); print }'; }
+tmmx_remote_session_name() { printf '__tmmx_remote__%s\n' "$(tmmx_encode_destination "$1")"; }
 tmmx_valid_session_name() { forbidden=$(printf '\t|'); [ -n "$1" ] && [ "$(printf '%s' "$1" | tr -d "$forbidden")" = "$1" ]; }
 tmmx_no_server_error() { grep -Eq 'no server running|error connecting to .*No such file or directory'; }
 
