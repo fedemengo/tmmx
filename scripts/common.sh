@@ -130,9 +130,9 @@ tmmx_fzf() {
   kill_command=$2
   reload_command=$3
   case "$picker_kind" in
-    manager) title='Hosts'; footer='Ctrl-x close · Ctrl-j scroll · i insert · Esc cancel' ;;
-    remote) title='Sessions'; footer='Ctrl-x kill · Ctrl-j scroll · i insert · Esc cancel' ;;
-    *) title='Sessions'; footer='Ctrl-x kill · Ctrl-j scroll · i insert · Esc cancel' ;;
+    manager) title='Hosts'; footer='Ctrl-x close · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
+    remote) title='Sessions'; footer='Ctrl-x kill · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
+    *) title='Sessions'; footer='Ctrl-x kill · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
   esac
   fzf_version=$(fzf --version 2>/dev/null | sed -n '1{s/[^0-9.].*$//;p;}')
   if ! awk -v version="$fzf_version" 'BEGIN { split(version, part, "."); exit !(part[1] > 0 || (part[1] == 0 && part[2] >= 35)) }'; then
@@ -157,12 +157,35 @@ tmmx_fzf() {
   fi
 }
 
+# Pickers start in a strict scroll mode: every printable key is ignored except
+# the movement keys, i (insert mode) and @ (insert mode with @ already typed).
+# Ctrl-j returns to scroll mode. fzf's action parser cannot take ) ] } > inside
+# one list, so those closers get their own calls with other delimiters.
+tmmx_fzf_key_list() { awk 'BEGIN { for (i = 33; i <= 126; i++) { c = sprintf("%c", i); if (index(")]}>", c) == 0) printf "%s%s", (n++ ? "," : ""), c } print ",space" }'; }
+tmmx_fzf_mode_action() { printf '%s(%s)+%s{),],>}+%s(})' "$1" "$(tmmx_fzf_key_list)" "$1" "$1"; }
+
 tmmx_run_fzf() {
   title=$1
   dynamic_title=$2
   shift 2
-  if [ "$dynamic_title" = 1 ]; then mode_bindings="i:unbind(j,k,i)+change-border-label( $title [insert] ),start:change-border-label( $title [scroll] ),ctrl-j:rebind(j,k,i)+change-border-label( $title [scroll] )"; else mode_bindings='i:unbind(j,k,i),ctrl-j:rebind(j,k,i)'; fi
-  fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2 --tabstop=1 --print-query --bind "j:down,k:up,$mode_bindings,enter:accept$kill_binding$reload_binding" "$@"
+  insert_mode=$(tmmx_fzf_mode_action unbind)
+  scroll_mode=$(tmmx_fzf_mode_action rebind)
+  if [ "$dynamic_title" = 1 ]; then
+    insert_mode="$insert_mode+change-border-label( $title [insert] )"
+    scroll_mode="$scroll_mode+change-border-label( $title [scroll] )"
+    start_binding=",start:change-border-label( $title [scroll] )"
+  else
+    start_binding=
+  fi
+  code=33
+  while [ "$code" -le 126 ]; do
+    key=$(printf "\\$(printf '%03o' "$code")")
+    case "$key" in j|k|g|G|i|@) ;; *) set -- "$@" --bind "$key:ignore" ;; esac
+    code=$((code + 1))
+  done
+  fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2 --tabstop=1 --print-query \
+    --bind "j:down,k:up,g:first,G:last,ctrl-d:half-page-down,ctrl-u:half-page-up,ctrl-f:page-down,ctrl-b:page-up,enter:accept$kill_binding$reload_binding$start_binding" \
+    --bind "i:$insert_mode" --bind "@:$insert_mode+put(@)" --bind "ctrl-j:$scroll_mode" --bind 'space:ignore' "$@"
 }
 
 tmmx_query() { printf '%s\n' "$1" | sed -n '1p'; }
