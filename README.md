@@ -28,12 +28,14 @@ Install the plugin on remote hosts as well when you want `Ctrl-\ f`, clipboard f
 
 ## Controls
 
-- `Ctrl-q w`: open the manager picker. Type `name` for a local session, `@host` for an SSH-backed tmux session, or `ssh user@host` to connect as a specific SSH user.
-- `Ctrl-q Tab`: switch between the two most recently used manager sessions.
+- `Ctrl-\ w`: open the manager picker. Type `name` for a local session, `@host` for an SSH-backed tmux session, or `ssh user@host` to connect as a specific SSH user.
+- `Ctrl-g`: switch to the previous manager-level session. Works from every managed session, including remote wrappers.
 - `Ctrl-\ f`: open a create-or-switch picker for the current tmux server.
-- `Ctrl-\ Space` or `Ctrl-\ Ctrl-Tab`: switch to the previous session on the current tmux server.
-- `Ctrl-\ Tab`: previous window on the current tmux server.
+- `Ctrl-\ Tab`, `Ctrl-\ Space`, or `Ctrl-\ Ctrl-Tab`: switch to the previous session on the current tmux server.
+- `Ctrl-q w` and `Ctrl-q Tab`: the same manager picker and previous manager-level session, on the manager key table.
 - `Ctrl-x`: close the highlighted local session or managed remote connection; in a remote-host picker, kill the highlighted remote session. Confirmation is required.
+
+Inside a managed remote wrapper, `Ctrl-\ w` still opens the local manager. Every other `Ctrl-\` chord is forwarded to the remote tmux unchanged, so `Ctrl-\ f` and `Ctrl-\ Tab` act on the remote host.
 
 Pickers start in scroll mode, where every printable key is ignored except the movement keys: `j` and `k` move by one row, `Ctrl-d` and `Ctrl-u` by half a page, `Ctrl-f` and `Ctrl-b` by a page, and `g` and `G` jump to the first and last row. Press `i` to enter insert mode and type, or `@` to enter insert mode with `@` already typed. `Ctrl-j` returns to scroll mode. `Tab` completes the highlighted row into the query, and `Enter` and `Esc` work in both modes.
 
@@ -67,6 +69,7 @@ set -g @tmmx_outer_prefix 'C-\'
 set -g @tmmx_manager_key 'C-q'
 set -g @tmmx_picker_key 'f'
 set -g @tmmx_manager_picker_key 'w'
+set -g @tmmx_previous_key 'C-g'
 set -g @tmmx_manager_local_sessions 'all' # or 'host' for one @local-host row
 set -g @tmmx_popup_width '60%'
 set -g @tmmx_popup_height '50%'
@@ -80,7 +83,7 @@ set -g @tmmx_host_colors 'personal-host=#a3be8c,work-host=#ff9e64'
 
 `@tmmx_popup_width` and `@tmmx_popup_height` are read each time a picker opens, so changing them with `set -g` takes effect immediately. The other options are read when the plugin loads.
 
-The outer prefix is an additional tmux root binding. It opens the local prefix table in local sessions and is forwarded unchanged through managed SSH wrappers.
+The outer prefix is an additional tmux root binding. It opens the local prefix table in local sessions. In managed SSH wrappers it opens a table where the manager picker key is handled locally and every other key is forwarded to the remote tmux after the outer prefix.
 
 `@tmmx_auto_reconnect` retries a managed SSH connection after a network drop and uses a five-second SSH keepalive so a half-open connection is detected. With `@tmmx_auto_restore` enabled, a recovered host with no tmux server is bootstrapped and its configured `@resurrect-restore-script-path` is invoked before tmmx reattaches. Restore is attempted once per outage and waits up to `@tmmx_restore_grace` seconds for the requested session.
 
