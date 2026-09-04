@@ -49,7 +49,11 @@ done
 for key in Space Tab BTab Enter Escape BSpace Up Down Left Right Home End PPage NPage IC DC \
   C-a C-b C-c C-d C-e C-f C-g C-h C-j C-k C-l C-m C-n C-o C-p C-q C-r C-s C-t C-u C-v C-w C-x C-y C-z C-Tab C-Space "$outer_prefix"; do forward "$key"; done
 if [ -n "$previous_manager_key" ] && [ "$previous_manager_key" != "$manager_key" ]; then tmux unbind-key -n "$previous_manager_key"; fi
-if [ -n "$previous_manager_picker_key" ] && [ "$previous_manager_picker_key" != "$manager_picker_key" ]; then tmux unbind-key -T tmmx-prefix "$previous_manager_picker_key"; tmux unbind-key "$previous_manager_picker_key"; fi
+if [ -n "$previous_manager_picker_key" ] && [ "$previous_manager_picker_key" != "$manager_picker_key" ]; then
+  tmux unbind-key -T tmmx-prefix "$previous_manager_picker_key"
+  # The old manager key may be the host picker key, which is bound above.
+  [ "$previous_manager_picker_key" = "$picker_key" ] || tmux unbind-key "$previous_manager_picker_key"
+fi
 if [ -n "$previous_previous_key" ] && [ "$previous_previous_key" != "$previous_key" ]; then tmux unbind-key -n "$previous_previous_key"; fi
 tmux unbind-key -T tmmx-prefix f
 tmux unbind-key -T tmmx-prefix w
