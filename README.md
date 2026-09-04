@@ -5,7 +5,7 @@
 ## Requirements
 
 - tmux 3.2 or newer;
-- fzf 0.35 or newer on the local machine and each remote host where you use the picker;
+- fzf 0.36 or newer on the local machine and each remote host where you use the picker;
 - SSH access to remote hosts.
 
 ## Install

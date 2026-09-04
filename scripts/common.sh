@@ -89,8 +89,14 @@ tmmx_list_manager_sessions() {
 }
 
 # Hosts declared in an OpenSSH client configuration, in file order, following
-# Include directives. Patterns with wildcards or negation are not connectable.
-tmmx_ssh_config_hosts() { tmmx_ssh_config_scan "${1:-$HOME/.ssh/config}" 0 | awk '!seen[$0]++'; }
+# Include directives. Patterns with wildcards or negation are not connectable,
+# and only aliases that are valid destinations on their own are offered.
+tmmx_ssh_config_hosts() {
+  tmmx_ssh_config_scan "${1:-$HOME/.ssh/config}" 0 | awk '!seen[$0]++' | while IFS= read -r alias; do
+    case "$alias" in *@*) continue ;; esac
+    tmmx_valid_ssh_destination "$alias" && printf '%s\n' "$alias"
+  done
+}
 tmmx_ssh_config_scan() {
   config_file=$1
   depth=$2
@@ -120,6 +126,7 @@ tmmx_list_manager_candidates() {
   existing=$(tmmx_list_sessions '' | cut -f1 | sed -n 's/^@//p')
   tmmx_ssh_config_hosts | while IFS= read -r host; do
     destination="$user$host"
+    tmmx_valid_ssh_destination "$destination" || continue
     printf '%s\n' "$existing" | grep -Fqx "$destination" && continue
     printf '%s\t0\tssh config\tssh:%s\n' "$(tmmx_host_label "$destination")" "$destination"
   done
@@ -137,8 +144,9 @@ tmmx_fzf() {
     *) title='Sessions'; footer='Ctrl-x kill · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
   esac
   fzf_version=$(fzf --version 2>/dev/null | sed -n '1{s/[^0-9.].*$//;p;}')
-  if ! awk -v version="$fzf_version" 'BEGIN { split(version, part, "."); exit !(part[1] > 0 || (part[1] == 0 && part[2] >= 35)) }'; then
-    message="tmmx requires fzf 0.35 or newer (found ${fzf_version:-none})"
+  # transform-query and put(...) need fzf 0.36.
+  if ! awk -v version="$fzf_version" 'BEGIN { split(version, part, "."); exit !(part[1] > 0 || (part[1] == 0 && part[2] >= 36)) }'; then
+    message="tmmx requires fzf 0.36 or newer (found ${fzf_version:-none})"
     printf '%s\n' "$message" >&2
     tmux display-message "$message" 2>/dev/null || true
     return 2

@@ -94,10 +94,10 @@ tmmx_valid_ssh_destination deploy@target-host-2
 # ssh config hosts: file order, Include followed, wildcards and duplicates dropped.
 config_dir=$(mktemp -d "${TMPDIR:-/tmp}/tmmx-test.XXXXXX")
 mkdir -p "$config_dir/.ssh/conf.d"
-printf 'Host alpha beta # trailing comment\nHost *.internal\nInclude conf.d/*.conf\nHost !bad ?q\nHost alpha\n' > "$config_dir/.ssh/config"
+printf 'Host alpha beta # trailing comment\nHost *.internal\nInclude conf.d/*.conf\nHost !bad ?q\nHost alpha\nHost -v -oProxyCommand=x user@alias\nHost ok.host\n' > "$config_dir/.ssh/config"
 printf 'Host gamma\n  HostName gamma.example\n' > "$config_dir/.ssh/conf.d/extra.conf"
 printf 'Include %s/.ssh/config\nHost target-host\n' "$config_dir" > "$config_dir/.ssh/conf.d/loop.conf"
-[ "$(HOME=$config_dir tmmx_ssh_config_hosts)" = "$(printf 'alpha\nbeta\ngamma\ntarget-host')" ]
+[ "$(HOME=$config_dir tmmx_ssh_config_hosts)" = "$(printf 'alpha\nbeta\ngamma\nok.host\ntarget-host')" ]
 [ "$(tmmx_ssh_config_hosts /nonexistent/config)" = '' ]
 
 # Candidates: sessions only until the query names a destination; then hosts from
@@ -105,13 +105,13 @@ printf 'Include %s/.ssh/config\nHost target-host\n' "$config_dir" > "$config_dir
 HOME=$config_dir
 [ "$(tmmx_list_manager_candidates '' plink all '')" = "$expected_manager" ]
 [ "$(tmmx_list_manager_candidates '' plink all 'loc')" = "$expected_manager" ]
-host_rows=$(printf '@alpha\t0\tssh config\tssh:alpha\n@beta\t0\tssh config\tssh:beta\n@gamma\t0\tssh config\tssh:gamma')
+host_rows=$(printf '@alpha\t0\tssh config\tssh:alpha\n@beta\t0\tssh config\tssh:beta\n@gamma\t0\tssh config\tssh:gamma\n@ok.host\t0\tssh config\tssh:ok.host')
 [ "$(tmmx_list_manager_candidates '' plink all '@')" = "$(printf '%s\n%s' "$expected_manager" "$host_rows")" ]
 [ "$(tmmx_list_manager_candidates '' plink all '@alp')" = "$(printf '%s\n%s' "$expected_manager" "$host_rows")" ]
 [ "$(tmmx_list_manager_candidates '' plink all 'ssh al')" = "$expected_manager" ]
-deploy_rows=$(printf 'deploy@alpha\t0\tssh config\tssh:deploy@alpha\ndeploy@beta\t0\tssh config\tssh:deploy@beta\ndeploy@gamma\t0\tssh config\tssh:deploy@gamma')
+deploy_rows=$(printf 'deploy@alpha\t0\tssh config\tssh:deploy@alpha\ndeploy@beta\t0\tssh config\tssh:deploy@beta\ndeploy@gamma\t0\tssh config\tssh:deploy@gamma\ndeploy@ok.host\t0\tssh config\tssh:deploy@ok.host')
 [ "$(tmmx_list_manager_candidates '' plink all 'deploy@')" = "$(printf '%s\n%s' "$expected_manager" "$deploy_rows")" ]
-ops_rows=$(printf 'ops@alpha\t0\tssh config\tssh:ops@alpha\nops@beta\t0\tssh config\tssh:ops@beta\nops@gamma\t0\tssh config\tssh:ops@gamma\nops@target-host\t0\tssh config\tssh:ops@target-host')
+ops_rows=$(printf 'ops@alpha\t0\tssh config\tssh:ops@alpha\nops@beta\t0\tssh config\tssh:ops@beta\nops@gamma\t0\tssh config\tssh:ops@gamma\nops@ok.host\t0\tssh config\tssh:ops@ok.host\nops@target-host\t0\tssh config\tssh:ops@target-host')
 [ "$(tmmx_list_manager_candidates '' plink all 'ops@')" = "$(printf '%s\n%s' "$expected_manager" "$ops_rows")" ]
 [ "$(tmmx_list_manager_candidates '' plink all 'bad user@')" = "$expected_manager" ]
 rm -rf "$config_dir"

@@ -34,7 +34,14 @@ connect_remote() {
   switch_to "$session"
 }
 
-case "$selected" in ssh:*) connect_remote "${selected#ssh:}"; exit 0 ;; esac
+case "$selected" in
+  ssh:*)
+    destination=${selected#ssh:}
+    if ! tmmx_valid_ssh_destination "$destination"; then tmux display-message "Not a usable SSH destination: $destination"; exit 1; fi
+    connect_remote "$destination"
+    exit 0
+    ;;
+esac
 if [ -n "$selected" ]; then switch_to "$selected"; exit 0; fi
 [ -n "$query" ] || exit 0
 
