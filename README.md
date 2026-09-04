@@ -78,6 +78,8 @@ set -g @tmmx_manager_host 'local-host'
 set -g @tmmx_host_colors 'personal-host=#a3be8c,work-host=#ff9e64'
 ```
 
+`@tmmx_popup_width` and `@tmmx_popup_height` are read each time a picker opens, so changing them with `set -g` takes effect immediately. The other options are read when the plugin loads.
+
 The outer prefix is an additional tmux root binding. It opens the local prefix table in local sessions and is forwarded unchanged through managed SSH wrappers.
 
 `@tmmx_auto_reconnect` retries a managed SSH connection after a network drop and uses a five-second SSH keepalive so a half-open connection is detected. With `@tmmx_auto_restore` enabled, a recovered host with no tmux server is bootstrapped and its configured `@resurrect-restore-script-path` is invoked before tmmx reattaches. Restore is attempted once per outage and waits up to `@tmmx_restore_grace` seconds for the requested session.
