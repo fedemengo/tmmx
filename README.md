@@ -29,7 +29,7 @@ Install the plugin on remote hosts as well when you want `Ctrl-\ f`, clipboard f
 ## Controls
 
 - `Ctrl-\ w`: open the manager picker. Type `name` for a local session, `@host` for an SSH-backed tmux session, or `ssh user@host` to connect as a specific SSH user.
-- `Ctrl-g`: switch to the previous manager-level session. Works from every managed session, including remote wrappers.
+- `Ctrl-Tab`: switch to the previous manager-level session. Works from every managed session, including remote wrappers.
 - `Ctrl-\ f`: open a create-or-switch picker for the current tmux server.
 - `Ctrl-\ Tab`, `Ctrl-\ Space`, or `Ctrl-\ Ctrl-Tab`: switch to the previous session on the current tmux server.
 - `Ctrl-q w` and `Ctrl-q Tab`: the same manager picker and previous manager-level session, on the manager key table.
@@ -69,7 +69,7 @@ set -g @tmmx_outer_prefix 'C-\'
 set -g @tmmx_manager_key 'C-q'
 set -g @tmmx_picker_key 'f'
 set -g @tmmx_manager_picker_key 'w'
-set -g @tmmx_previous_key 'C-g'
+set -g @tmmx_previous_key 'C-Tab'
 set -g @tmmx_manager_local_sessions 'all' # or 'host' for one @local-host row
 set -g @tmmx_popup_width '60%'
 set -g @tmmx_popup_height '50%'
@@ -80,6 +80,8 @@ set -g @tmmx_restore_grace 5
 set -g @tmmx_manager_host 'local-host'
 set -g @tmmx_host_colors 'personal-host=#a3be8c,work-host=#ff9e64'
 ```
+
+tmmx turns on tmux's `extended-keys` option so that chords such as `Ctrl-Tab` arrive as distinct keys. The terminal must support extended key reporting; Alacritty, kitty, WezTerm, and iTerm2 do.
 
 `@tmmx_popup_width` and `@tmmx_popup_height` are read each time a picker opens, so changing them with `set -g` takes effect immediately. The other options are read when the plugin loads.
 

@@ -10,7 +10,7 @@ previous_key=$(tmux show-options -gqv @tmmx_previous_key)
 [ -n "$manager_key" ] || manager_key='C-q'
 [ -n "$picker_key" ] || picker_key='f'
 [ -n "$manager_picker_key" ] || manager_picker_key='w'
-[ -n "$previous_key" ] || previous_key='C-g'
+[ -n "$previous_key" ] || previous_key='C-Tab'
 previous_manager_key=$(tmux show-options -gqv @tmmx_bound_manager_key)
 previous_manager_picker_key=$(tmux show-options -gqv @tmmx_bound_manager_picker_key)
 previous_previous_key=$(tmux show-options -gqv @tmmx_bound_previous_key)
@@ -21,7 +21,10 @@ manager_popup="TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/popup.sh' '#{cli
 
 tmux set-option -g @tmmx_path "$CURRENT_DIR"
 tmux set-option -s set-clipboard on
-tmux set-option -as terminal-features ',screen*:clipboard,alacritty:clipboard'
+tmux set-option -as terminal-features ',screen*:clipboard,alacritty:clipboard,alacritty:extkeys'
+# Ctrl-Tab and similar chords only reach tmux as distinct keys when it asks the
+# terminal for extended key reporting.
+tmux set-option -s extended-keys on
 # Locally the outer prefix opens the prefix table. Inside a managed remote
 # wrapper it opens the tmmx-outer table instead: the manager picker key is
 # handled here, and every other key is re-sent to the remote tmux after the
