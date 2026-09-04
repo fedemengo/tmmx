@@ -7,6 +7,7 @@ tmmx_list_sessions() {
     [ "$session" = "$current_session" ] && continue
     [ "$manager" = 1 ] && continue
     timestamp=$(tmmx_format_timestamp "$last_attached")
+    last_attached=${last_attached:-0}
     if [ "$remote" = 1 ]; then printf '@%s\t%s\t%s\t%s\n' "$host" "$last_attached" "$timestamp" "$session"; else printf '%s\t%s\t%s\t%s\n' "$session" "$last_attached" "$timestamp" "$session"; fi
   done
 }
@@ -85,9 +86,49 @@ tmmx_list_manager_sessions() {
   done
 }
 
+# Hosts declared in an OpenSSH client configuration, in file order, following
+# Include directives. Patterns with wildcards or negation are not connectable.
+tmmx_ssh_config_hosts() { tmmx_ssh_config_scan "${1:-$HOME/.ssh/config}" 0 | awk '!seen[$0]++'; }
+tmmx_ssh_config_scan() {
+  config_file=$1
+  depth=$2
+  [ -r "$config_file" ] && [ "$depth" -lt 8 ] || return 0
+  awk '{ sub(/#.*/, ""); key = tolower($1); if (key == "host") { for (i = 2; i <= NF; i++) if ($i !~ /[*?!]/) print "host\t" $i } else if (key == "include") { for (i = 2; i <= NF; i++) print "include\t" $i } }' "$config_file" | while IFS="$(printf '\t')" read -r kind value; do
+    case "$kind" in
+      host) printf '%s\n' "$value" ;;
+      include)
+        case "$value" in '~/'*) value="$HOME/${value#\~/}" ;; /*) ;; *) value="$HOME/.ssh/$value" ;; esac
+        for included in $value; do tmmx_ssh_config_scan "$included" $((depth + 1)); done
+        ;;
+    esac
+  done
+}
+
+# Manager rows for a query: matching sessions, then, once the query names an SSH
+# destination (@host or user@host), configured hosts that have no wrapper yet. Host rows carry an ssh: target so the picker connects instead of switching.
+tmmx_list_manager_candidates() {
+  current_session=$1
+  manager_host=$2
+  local_sessions=$3
+  query=$4
+  tmmx_list_manager_sessions "$current_session" "$manager_host" "$local_sessions"
+  case "$query" in *@*) user=${query%%@*} ;; *) return 0 ;; esac
+  case "$user" in *[!A-Za-z0-9._-]*) return 0 ;; esac
+  [ -n "$user" ] && user="$user@"
+  existing=$(tmmx_list_sessions '' | cut -f1 | sed -n 's/^@//p')
+  tmmx_ssh_config_hosts | while IFS= read -r host; do
+    destination="$user$host"
+    printf '%s\n' "$existing" | grep -Fqx "$destination" && continue
+    printf '%s\t0\tssh config\tssh:%s\n' "$(tmmx_host_label "$destination")" "$destination"
+  done
+}
+
+tmmx_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+
 tmmx_fzf() {
   picker_kind=$1
   kill_command=$2
+  reload_command=$3
   case "$picker_kind" in
     manager) title='Hosts'; footer='Ctrl-x close · Ctrl-j scroll · i insert · Esc cancel' ;;
     remote) title='Sessions'; footer='Ctrl-x kill · Ctrl-j scroll · i insert · Esc cancel' ;;
@@ -106,6 +147,8 @@ tmmx_fzf() {
   case "$picker_columns" in ''|*[!0-9]*) picker_columns=${COLUMNS:-} ;; esac
   case "$picker_columns" in ''|*[!0-9]*) picker_columns=$(tput cols 2>/dev/null || printf 0) ;; esac
   case "$picker_columns" in ''|*[!0-9]*) picker_columns=0 ;; esac
+  reload_binding=
+  [ -n "$reload_command" ] && reload_binding=",change:reload($reload_command {q} | TMMX_PICKER_COLUMNS=$picker_columns sh $(tmmx_quote "$TMMX_DIR/scripts/format-picker.sh"))"
   if awk -v version="$fzf_version" 'BEGIN { split(version, part, "."); exit !(part[1] > 0 || (part[1] == 0 && part[2] >= 63)) }'; then
     TMMX_PICKER_COLUMNS="$picker_columns" "$TMMX_DIR/scripts/format-picker.sh" | tmmx_run_fzf "$title" 1 --border-label=" $title [scroll] " --footer="$footer"
   else
@@ -119,7 +162,7 @@ tmmx_run_fzf() {
   dynamic_title=$2
   shift 2
   if [ "$dynamic_title" = 1 ]; then mode_bindings="i:unbind(j,k,i)+change-border-label( $title [insert] ),start:change-border-label( $title [scroll] ),ctrl-j:rebind(j,k,i)+change-border-label( $title [scroll] )"; else mode_bindings='i:unbind(j,k,i),ctrl-j:rebind(j,k,i)'; fi
-  fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2 --tabstop=1 --print-query --bind "j:down,k:up,$mode_bindings,enter:accept$kill_binding" "$@"
+  fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2 --tabstop=1 --print-query --bind "j:down,k:up,$mode_bindings,enter:accept$kill_binding$reload_binding" "$@"
 }
 
 tmmx_query() { printf '%s\n' "$1" | sed -n '1p'; }

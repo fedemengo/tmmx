@@ -7,7 +7,8 @@ manager_host=$(tmmx_manager_host)
 local_sessions=$(tmux show-options -gqv @tmmx_manager_local_sessions)
 [ "$local_sessions" = host ] || local_sessions=all
 if [ "$local_sessions" = host ] && [ "$(tmux display-message -p '#{@tmmx_remote}')" != 1 ] && [ "$(tmux display-message -p '#{@tmmx_manager}')" != 1 ]; then local_sessions=none; fi
-result=$(tmmx_list_manager_sessions "$current_session" "$manager_host" "$local_sessions" | tmmx_fzf manager "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/kill-session.sh' {3}" || true)
+candidates_command="TMMX_DIR=$(tmmx_quote "$TMMX_DIR") sh $(tmmx_quote "$TMMX_DIR/scripts/manager-candidates.sh") $(tmmx_quote "$current_session") $(tmmx_quote "$manager_host") $(tmmx_quote "$local_sessions")"
+result=$(tmmx_list_manager_candidates "$current_session" "$manager_host" "$local_sessions" '' | tmmx_fzf manager "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/kill-session.sh' {3}" "$candidates_command" || true)
 query=$(tmmx_query "$result")
 selected=$(tmmx_selection "$result")
 
@@ -33,6 +34,7 @@ connect_remote() {
   switch_to "$session"
 }
 
+case "$selected" in ssh:*) connect_remote "${selected#ssh:}"; exit 0 ;; esac
 if [ -n "$selected" ]; then switch_to "$selected"; exit 0; fi
 [ -n "$query" ] || exit 0
 
