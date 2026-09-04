@@ -35,7 +35,7 @@ Install the plugin on remote hosts as well when you want `Ctrl-\ f`, clipboard f
 - `Ctrl-\ Tab`: previous window on the current tmux server.
 - `Ctrl-x`: close the highlighted local session or managed remote connection; in a remote-host picker, kill the highlighted remote session. Confirmation is required.
 
-Pickers start in scroll mode, where every printable key is ignored except the movement keys: `j` and `k` move by one row, `Ctrl-d` and `Ctrl-u` by half a page, `Ctrl-f` and `Ctrl-b` by a page, and `g` and `G` jump to the first and last row. Press `i` to enter insert mode and type, or `@` to enter insert mode with `@` already typed. `Ctrl-j` returns to scroll mode; `Enter` and `Esc` work in both modes.
+Pickers start in scroll mode, where every printable key is ignored except the movement keys: `j` and `k` move by one row, `Ctrl-d` and `Ctrl-u` by half a page, `Ctrl-f` and `Ctrl-b` by a page, and `g` and `G` jump to the first and last row. Press `i` to enter insert mode and type, or `@` to enter insert mode with `@` already typed. `Ctrl-j` returns to scroll mode. `Tab` completes the highlighted row into the query, and `Enter` and `Esc` work in both modes.
 
 ## Remote workflow
 
