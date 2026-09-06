@@ -34,11 +34,22 @@ option_enabled @tmmx_auto_restore && auto_restore=1
 restore_grace=$(tmux show-options -gqv @tmmx_restore_grace)
 case "$restore_grace" in ''|*[!0-9]*) restore_grace=5 ;; esac
 restore_attempted=0
+# Reconnect uses capped exponential backoff so a host that stays unreachable (or
+# whose tmux never answers) is retried ever more slowly instead of hammered every
+# few seconds. Any forward progress (discovery, listing, or a live attach) resets
+# it, so a transient drop still recovers quickly.
+reconnect_max=$(tmux show-options -gqv @tmmx_reconnect_max)
+case "$reconnect_max" in ''|*[!0-9]*) reconnect_max=60 ;; esac
+[ "$reconnect_max" -ge "$reconnect_delay" ] || reconnect_max=$reconnect_delay
+backoff=$reconnect_delay
 
 reconnecting() {
-  printf '\033[2J\033[HConnection to %s lost. Reconnecting…\nPress Ctrl-c to stop.\n' "$host"
-  sleep "$reconnect_delay"
+  printf '\033[2J\033[HConnection to %s lost. Reconnecting in %ss…\nPress Ctrl-c to stop.\n' "$host" "$backoff"
+  sleep "$backoff"
+  backoff=$((backoff * 2))
+  [ "$backoff" -le "$reconnect_max" ] || backoff=$reconnect_max
 }
+reset_backoff() { backoff=$reconnect_delay; }
 
 discover_tmux() {
   [ -n "$remote_tmux_bin" ] && return 0
@@ -89,6 +100,7 @@ while ! discover_tmux; do
   pause_before_exit
   exit 1
 done
+reset_backoff
 
 first_direct=$inner
 while :; do
@@ -107,6 +119,7 @@ while :; do
       pause_before_exit; exit 1
     fi
     rm -f "$error_file"
+    reset_backoff
     if [ -n "$sessions" ]; then
       result=$(printf '%s\n' "$sessions" | sort -t '|' -k1,1nr | while IFS='|' read -r last_attached remote_session; do printf '%s\t%s\t%s\t%s\n' "$remote_session" "$last_attached" "$(tmmx_format_timestamp "$last_attached")" "$remote_session"; done | tmmx_fzf remote "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/remote-kill-session.sh' '$host' '$remote_tmux_bin' {3}" || true)
     else
@@ -137,6 +150,7 @@ while :; do
     status=$?
     if [ "$status" -eq 255 ] && [ "$auto_reconnect" = 1 ]; then rm -f "$error_file"; reconnecting; recovering=1; continue; fi
     rm -f "$error_file"
+    reset_backoff
     break
   done
 done

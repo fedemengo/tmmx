@@ -77,6 +77,7 @@ set -g @tmmx_popup_width '60%'
 set -g @tmmx_popup_height '50%'
 set -g @tmmx_auto_reconnect 'off'
 set -g @tmmx_reconnect_delay 2
+set -g @tmmx_reconnect_max 60
 set -g @tmmx_auto_restore 'off'
 set -g @tmmx_restore_grace 5
 set -g @tmmx_manager_host 'local-host'
@@ -89,7 +90,7 @@ tmmx turns on tmux's `extended-keys` option so that chords such as `Ctrl-Tab` ar
 
 The outer prefix is an additional tmux root binding. It opens the local prefix table in local sessions. In managed SSH wrappers it opens a table where the manager picker key is handled locally and every other key is forwarded to the remote tmux after the outer prefix.
 
-`@tmmx_auto_reconnect` retries a managed SSH connection after a network drop and uses a five-second SSH keepalive so a half-open connection is detected. With `@tmmx_auto_restore` enabled, a recovered host with no tmux server is bootstrapped and its configured `@resurrect-restore-script-path` is invoked before tmmx reattaches. Restore is attempted once per outage and waits up to `@tmmx_restore_grace` seconds for the requested session.
+`@tmmx_auto_reconnect` retries a managed SSH connection after a network drop and uses a five-second SSH keepalive so a half-open connection is detected. With `@tmmx_auto_restore` enabled, a recovered host with no tmux server is bootstrapped and its configured `@resurrect-restore-script-path` is invoked before tmmx reattaches. Restore is attempted once per outage and waits up to `@tmmx_restore_grace` seconds for the requested session. Reconnect attempts use capped exponential backoff — starting at `@tmmx_reconnect_delay` and doubling up to `@tmmx_reconnect_max` seconds — so a host that stays unreachable is retried slowly rather than hammered; any successful step resets the delay.
 
 After a tmux-resurrect restore, a managed remote wrapper comes back as a plain shell because resurrect does not re-run its ssh. tmmx reopens it: switching to such a wrapper reconnects it on the spot, straight to the remote session it was on (tmmx remembers each wrapper's last session under `~/.local/share/tmmx`, override with `TMMX_STATE_DIR`). With `@tmmx_auto_reconnect` on, restored wrappers are also reopened in the background after the restore, one at a time, without waiting for you to visit them.
 
