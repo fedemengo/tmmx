@@ -1,6 +1,9 @@
 #!/bin/sh
 
 host=$1
+# Optional inner session: when given, attach straight to it and skip the picker.
+# Used to reopen a restored wrapper on the session it was on before.
+inner=${2:-}
 . "$TMMX_DIR/scripts/common.sh"
 
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
@@ -17,26 +20,6 @@ pause_before_exit() {
 }
 remote_tmux_bin=${TMMX_REMOTE_TMUX:-}
 remote_preamble='PATH=$HOME/.local/bin:$HOME/bin:$PATH; export PATH; for tmmx_locale in C.utf8 C.UTF-8 en_US.utf8 en_US.UTF-8; do if locale -a 2>/dev/null | grep -qx "$tmmx_locale"; then export LC_ALL="$tmmx_locale"; break; fi; done; '
-
-if [ -z "$remote_tmux_bin" ]; then
-  remote_tmux_bin=$(ssh_batch "$host" 'PATH=$HOME/.local/bin:$HOME/bin:$PATH; export PATH; tmmx_tmux=$(command -v tmux || { command -v zsh >/dev/null 2>&1 && zsh -ic "command -v tmux" 2>/dev/null | sed -n "/^\\//{p;q;}"; }); [ -n "$tmmx_tmux" ] && printf "__TMMX_BIN__%s\\n" "$tmmx_tmux"' | sed -n 's/^__TMMX_BIN__//p' | sed -n '1p')
-fi
-
-[ -n "$remote_tmux_bin" ] || {
-  printf 'Could not find tmux on %s. Set TMMX_REMOTE_TMUX to its path if necessary.\n' "$host" >&2
-  pause_before_exit
-  exit 1
-}
-
-remote_tmux() {
-  remote_command="$remote_preamble exec $(quote "$remote_tmux_bin")"
-  for argument in "$@"; do remote_command="$remote_command $(quote "$argument")"; done
-  ssh_batch "$host" "$remote_command"
-}
-
-remote_sessions() {
-  remote_tmux list-sessions -F '__TMMX_SESSION__#{session_last_attached}|#{session_name}'
-}
 
 option_enabled() {
   case "$(tmux show-options -gqv "$1")" in 1|on|true|yes) return 0 ;; *) return 1 ;; esac
@@ -55,6 +38,22 @@ restore_attempted=0
 reconnecting() {
   printf '\033[2J\033[HConnection to %s lost. Reconnecting…\nPress Ctrl-c to stop.\n' "$host"
   sleep "$reconnect_delay"
+}
+
+discover_tmux() {
+  [ -n "$remote_tmux_bin" ] && return 0
+  remote_tmux_bin=$(ssh_batch "$host" 'PATH=$HOME/.local/bin:$HOME/bin:$PATH; export PATH; tmmx_tmux=$(command -v tmux || { command -v zsh >/dev/null 2>&1 && zsh -ic "command -v tmux" 2>/dev/null | sed -n "/^\\//{p;q;}"; }); [ -n "$tmmx_tmux" ] && printf "__TMMX_BIN__%s\\n" "$tmmx_tmux"' | sed -n 's/^__TMMX_BIN__//p' | sed -n '1p')
+  [ -n "$remote_tmux_bin" ]
+}
+
+remote_tmux() {
+  remote_command="$remote_preamble exec $(quote "$remote_tmux_bin")"
+  for argument in "$@"; do remote_command="$remote_command $(quote "$argument")"; done
+  ssh_batch "$host" "$remote_command"
+}
+
+remote_sessions() {
+  remote_tmux list-sessions -F '__TMMX_SESSION__#{session_last_attached}|#{session_name}'
 }
 
 restore_if_needed() {
@@ -81,24 +80,47 @@ restore_if_needed() {
   remote_tmux kill-session -t "=$bootstrap" 2>/dev/null || true
 }
 
+# Locate the remote tmux. With auto-reconnect on, a currently unreachable host is
+# retried instead of ending the wrapper, so a reopened session waits for the host
+# to come back exactly like a dropped connection does.
+while ! discover_tmux; do
+  printf 'Could not find tmux on %s. Set TMMX_REMOTE_TMUX to its path if necessary.\n' "$host" >&2
+  if [ "$auto_reconnect" = 1 ]; then reconnecting; continue; fi
+  pause_before_exit
+  exit 1
+done
+
+first_direct=$inner
 while :; do
-  error_file=$(mktemp "${TMPDIR:-/tmp}/tmmx.XXXXXX") || exit 1
-  session_output=$(remote_sessions 2>"$error_file")
-  status=$?
-  sessions=$(printf '%s\n' "$session_output" | sed -n 's/^__TMMX_SESSION__//p')
-  if [ "$status" -ne 0 ] && ! tmmx_no_server_error <"$error_file"; then printf 'Could not list tmux sessions on %s.\n' "$host" >&2; sed -n '1,3p' "$error_file" >&2; rm -f "$error_file"; pause_before_exit; exit 1; fi
-  rm -f "$error_file"
-  if [ -n "$sessions" ]; then
-    result=$(printf '%s\n' "$sessions" | sort -t '|' -k1,1nr | while IFS='|' read -r last_attached remote_session; do printf '%s\t%s\t%s\t%s\n' "$remote_session" "$last_attached" "$(tmmx_format_timestamp "$last_attached")" "$remote_session"; done | tmmx_fzf remote "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/remote-kill-session.sh' '$host' '$remote_tmux_bin' {3}" || true)
+  if [ -n "$first_direct" ]; then
+    # Reopen path: go straight to the remembered session.
+    session=$first_direct
+    first_direct=
   else
-    result=$(printf 'main\n')
+    error_file=$(mktemp "${TMPDIR:-/tmp}/tmmx.XXXXXX") || exit 1
+    session_output=$(remote_sessions 2>"$error_file")
+    status=$?
+    sessions=$(printf '%s\n' "$session_output" | sed -n 's/^__TMMX_SESSION__//p')
+    if [ "$status" -ne 0 ] && ! tmmx_no_server_error <"$error_file"; then
+      printf 'Could not list tmux sessions on %s.\n' "$host" >&2; sed -n '1,3p' "$error_file" >&2; rm -f "$error_file"
+      if [ "$auto_reconnect" = 1 ]; then reconnecting; continue; fi
+      pause_before_exit; exit 1
+    fi
+    rm -f "$error_file"
+    if [ -n "$sessions" ]; then
+      result=$(printf '%s\n' "$sessions" | sort -t '|' -k1,1nr | while IFS='|' read -r last_attached remote_session; do printf '%s\t%s\t%s\t%s\n' "$remote_session" "$last_attached" "$(tmmx_format_timestamp "$last_attached")" "$remote_session"; done | tmmx_fzf remote "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/remote-kill-session.sh' '$host' '$remote_tmux_bin' {3}" || true)
+    else
+      result=$(printf 'main\n')
+    fi
+    query=$(tmmx_query "$result")
+    selected=$(tmmx_selection "$result")
+    session=${selected:-$query}
+    [ -n "$session" ] || exit 0
+    if ! tmmx_valid_session_name "$session"; then printf 'Session names cannot contain tabs or |.\n' >&2; continue; fi
+    session=$(tmmx_session_name "$session")
   fi
-  query=$(tmmx_query "$result")
-  selected=$(tmmx_selection "$result")
-  session=${selected:-$query}
-  [ -n "$session" ] || exit 0
-  if ! tmmx_valid_session_name "$session"; then printf 'Session names cannot contain tabs or |.\n' >&2; continue; fi
-  session=$(tmmx_session_name "$session")
+  # Remember the session so a later reopen can attach here without the picker.
+  tmmx_remember_inner "$host" "$session"
   attach_command="$remote_preamble exec $(quote "$remote_tmux_bin") new-session -A -s"
   recovering=0
   while :; do

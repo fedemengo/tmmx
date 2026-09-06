@@ -75,3 +75,19 @@ if [ "$(tmux show-options -gqv @tmmx_session_hook_installed)" != 1 ]; then
   tmux set-hook -ag session-created "run-shell \"TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/tag-sessions.sh'\""
   tmux set-option -g @tmmx_session_hook_installed 1
 fi
+
+# Reopen restored remote wrappers: lazily when a client switches to one, and,
+# with @tmmx_auto_reconnect on, in the background after a resurrect restore.
+if [ "$(tmux show-options -gqv @tmmx_reconnect_hooks_installed)" != 1 ]; then
+  tmux set-hook -ag client-session-changed "run-shell -b \"TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/reconnect.sh' '#{client_session}'\""
+  reopen_shell="TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/reopen.sh' >/dev/null 2>&1 &"
+  existing_restore_hook=$(tmux show-options -gqv @resurrect-hook-post-restore-all)
+  case "$existing_restore_hook" in
+    *reopen.sh*) ;;
+    '') tmux set-option -g @resurrect-hook-post-restore-all "$reopen_shell" ;;
+    *) tmux set-option -g @resurrect-hook-post-restore-all "$existing_restore_hook ; $reopen_shell" ;;
+  esac
+  tmux set-option -g @tmmx_reconnect_hooks_installed 1
+fi
+# Kick the background reopener now, in case the restore already completed.
+tmux run-shell -b "TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/reopen.sh'"

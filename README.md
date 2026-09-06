@@ -89,6 +89,8 @@ The outer prefix is an additional tmux root binding. It opens the local prefix t
 
 `@tmmx_auto_reconnect` retries a managed SSH connection after a network drop and uses a five-second SSH keepalive so a half-open connection is detected. With `@tmmx_auto_restore` enabled, a recovered host with no tmux server is bootstrapped and its configured `@resurrect-restore-script-path` is invoked before tmmx reattaches. Restore is attempted once per outage and waits up to `@tmmx_restore_grace` seconds for the requested session.
 
+After a tmux-resurrect restore, a managed remote wrapper comes back as a plain shell because resurrect does not re-run its ssh. tmmx reopens it: switching to such a wrapper reconnects it on the spot, straight to the remote session it was on (tmmx remembers each wrapper's last session under `~/.local/share/tmmx`, override with `TMMX_STATE_DIR`). With `@tmmx_auto_reconnect` on, restored wrappers are also reopened in the background after the restore, one at a time, without waiting for you to visit them.
+
 Automatic reconnect and restore are reliable only when SSH authentication is non-interactive: an agent-loaded key, an unprotected key, or a key whose passphrase is already cached. This applies equally to `@host` and `ssh user@host` targets, and the key can come from the host's `Host` entry. A password or passphrase prompt during a reconnect attempt blocks the wrapper until it is answered.
 
 `@tmmx_host_colors` keys can be a host alias or a complete `user@host` destination. A `user@host` entry matches only that destination, and a host alias also colors every `user@host` destination for that host.
