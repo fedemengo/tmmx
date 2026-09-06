@@ -13,11 +13,17 @@ case "$delay" in ''|*[!0-9]*) delay=2 ;; esac
 state_dir=$(tmmx_state_dir)
 mkdir -p "$state_dir" 2>/dev/null || exit 0
 lock="$state_dir/reopen.lock"
-mkdir "$lock" 2>/dev/null || exit 0   # another worker is already running
-trap 'rmdir "$lock" 2>/dev/null' EXIT INT TERM
-
-list_file=$(mktemp "${TMPDIR:-/tmp}/tmmx-reopen.XXXXXX") || exit 0
-trap 'rmdir "$lock" 2>/dev/null; rm -f "$list_file"' EXIT INT TERM
+# Single worker at a time, but a lock left by a worker that died uncleanly must
+# not block every future reopen: take it over when its owner is gone.
+if ! mkdir "$lock" 2>/dev/null; then
+  owner=$(cat "$lock/pid" 2>/dev/null)
+  if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then exit 0; fi
+  rm -f "$lock/pid" 2>/dev/null; rmdir "$lock" 2>/dev/null
+  mkdir "$lock" 2>/dev/null || exit 0
+fi
+printf '%s\n' "$$" > "$lock/pid" 2>/dev/null
+list_file=$(mktemp "${TMPDIR:-/tmp}/tmmx-reopen.XXXXXX") || { rm -f "$lock/pid" 2>/dev/null; rmdir "$lock" 2>/dev/null; exit 0; }
+trap 'rm -f "$lock/pid" 2>/dev/null; rmdir "$lock" 2>/dev/null; rm -f "$list_file"' EXIT INT TERM
 
 while :; do
   kicked=0
