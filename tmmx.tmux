@@ -32,6 +32,7 @@ tmux set-option -s extended-keys on
 tmux bind-key -n "$outer_prefix" if-shell -F '#{==:#{@tmmx_remote},1}' 'switch-client -T tmmx-outer' 'switch-client -T prefix'
 tmux bind-key "$picker_key" run-shell -b "TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/popup.sh' '#{client_tty}' picker"
 tmux bind-key "$manager_picker_key" run-shell -b "$manager_popup"
+tmux bind-key Space switch-client -l
 tmux unbind-key -a -T tmmx-outer 2>/dev/null || true
 tmux bind-key -T tmmx-outer "$manager_picker_key" run-shell -b "$manager_popup"
 forward() { [ "$1" = "$manager_picker_key" ] || tmux bind-key -T tmmx-outer "$1" send-keys "$outer_prefix" "$1"; }
