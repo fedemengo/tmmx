@@ -10,5 +10,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - run: sh -n tmmx.tmux bin/tmmx scripts/*.sh tests/test-common.sh
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tmux
+      - run: sh -n tmmx.tmux bin/tmmx scripts/*.sh tests/test-common.sh tests/test-bindings.sh
       - run: sh tests/test-common.sh
+      - run: sh tests/test-bindings.sh
