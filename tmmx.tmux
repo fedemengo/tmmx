@@ -65,6 +65,22 @@ tmux set-option -g @tmmx_bound_manager_picker_key "$manager_picker_key"
 # remote wrappers, because it is handled locally before the pane sees it.
 tmux bind-key -n "$previous_key" if-shell -F '#{==:#{@tmmx_managed},1}' 'switch-client -l' "send-keys $forwarded_previous_key"
 tmux set-option -g @tmmx_bound_previous_key "$previous_key"
+# One-handed scoped previous switch: the nav key (default Ctrl-`) then a digit —
+# 1 previous window in the session, 2 previous session on this host, 3 previous
+# session across hosts. In a remote wrapper 1 and 2 are forwarded to the remote
+# (so they act on that host), while 3 stays manager-local. Additive to the
+# Ctrl-\ Tab / Ctrl-\ Space / Ctrl-Tab bindings.
+nav_key=$(tmux show-options -gqv @tmmx_nav_key)
+[ -n "$nav_key" ] || nav_key='C-`'
+forwarded_nav_key=$(printf '%s' "$nav_key" | sed 's/\\/\\\\/g')
+previous_nav_key=$(tmux show-options -gqv @tmmx_bound_nav_key)
+if [ -n "$previous_nav_key" ] && [ "$previous_nav_key" != "$nav_key" ]; then tmux unbind-key -n "$previous_nav_key"; fi
+tmux bind-key -n "$nav_key" if-shell -F '#{==:#{@tmmx_managed},1}' 'switch-client -T tmmx-nav' "send-keys $forwarded_nav_key"
+tmux unbind-key -a -T tmmx-nav 2>/dev/null || true
+tmux bind-key -T tmmx-nav 1 if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix Tab" 'last-window'
+tmux bind-key -T tmmx-nav 2 if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix Space" 'switch-client -l'
+tmux bind-key -T tmmx-nav 3 switch-client -l
+tmux set-option -g @tmmx_bound_nav_key "$nav_key"
 tmux bind-key -T tmmx-prefix "$manager_picker_key" run-shell -b "$manager_popup" \; switch-client -T root
 tmux bind-key -T tmmx-prefix Tab switch-client -l
 tmux bind-key -T tmmx-prefix C-Tab switch-client -l

@@ -55,4 +55,17 @@ tmux list-keys -T root | awk '$1=="bind-key" && $4=="C-Tab"' | grep -q . || {
   exit 1
 }
 
+# One-handed scoped nav: the nav key (default Ctrl-`) is a prefix into tmmx-nav,
+# with digits 1/2/3 bound.
+tmux list-keys -T root | awk '$1=="bind-key" && $4=="C-`"' | grep -q . || {
+  printf 'FAIL: nav key C-` not bound at root\n' >&2
+  exit 1
+}
+for d in 1 2 3; do
+  tmux list-keys -T tmmx-nav | awk -v d="$d" '$1=="bind-key" && $4==d' | grep -q . || {
+    printf 'FAIL: tmmx-nav %s not bound\n' "$d" >&2
+    exit 1
+  }
+done
+
 printf 'test-bindings: ok\n'

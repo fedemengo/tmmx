@@ -30,6 +30,7 @@ Install the plugin on remote hosts as well when you want `Ctrl-\ f`, clipboard f
 
 - `Ctrl-\ w`: open the manager picker. Type `name` for a local session, `@host` for an SSH-backed tmux session, or `ssh user@host` to connect as a specific SSH user.
 - `Ctrl-Tab`: switch to the previous manager-level session. Works from every managed session, including remote wrappers.
+- `Ctrl-`` then `1`/`2`/`3`: one-handed scoped previous switch — `1` previous window in the session, `2` previous session on this host, `3` previous session across hosts. In a remote wrapper `1` and `2` act on that host. Set the prefix with `@tmmx_nav_key`.
 - `Ctrl-\ f`: open a create-or-switch picker for the current tmux server.
 - `Ctrl-\ Tab`, `Ctrl-\ Space`, or `Ctrl-\ Ctrl-Tab`: switch to the previous session on the current tmux server.
 - `Ctrl-q w` and `Ctrl-q Tab`: the same manager picker and previous manager-level session, on the manager key table.
@@ -70,6 +71,7 @@ set -g @tmmx_manager_key 'C-q'
 set -g @tmmx_picker_key 'f'
 set -g @tmmx_manager_picker_key 'w'
 set -g @tmmx_previous_key 'C-Tab'
+set -g @tmmx_nav_key 'C-`'
 set -g @tmmx_manager_local_sessions 'all' # or 'host' for one @local-host row
 set -g @tmmx_popup_width '60%'
 set -g @tmmx_popup_height '50%'
