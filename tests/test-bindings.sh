@@ -47,8 +47,11 @@ assert_prefix() {
 
 # Window nav (Ctrl-\ Tab) is the user's and must survive loading tmmx.
 assert_prefix Tab last-window
-# Session-on-host nav (Ctrl-\ Space) is tmmx's.
-assert_prefix Space "switch-client -l"
+# Session-on-host nav (Ctrl-\ Space) is tmmx's (host-scoped previous switch).
+case "$(prefix_cmd Space)" in
+  *switch-scope.sh*host*) ;;
+  *) printf 'FAIL: prefix Space is [%s], expected tmmx within-host switch\n' "$(prefix_cmd Space)" >&2; exit 1 ;;
+esac
 # Across-host previous session is the root previous key (Ctrl-Tab default).
 tmux list-keys -T root | awk '$1=="bind-key" && $4=="C-Tab"' | grep -q . || {
   printf 'FAIL: root C-Tab (across-host previous session) not bound\n' >&2

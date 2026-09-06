@@ -213,6 +213,15 @@ tmmx_remote_session_name() { printf '__tmmx_remote__%s\n' "$(tmmx_encode_destina
 tmmx_valid_session_name() { forbidden=$(printf '\t|'); [ -n "$1" ] && [ "$(printf '%s' "$1" | tr -d "$forbidden")" = "$1" ]; }
 tmmx_no_server_error() { grep -Eq 'no server running|error connecting to .*No such file or directory'; }
 
+# A session's host: its @tmmx_host for a remote wrapper, otherwise "local".
+tmmx_session_host() {
+  if [ "$(tmux show-options -t "=$1:" -qv @tmmx_remote 2>/dev/null)" = 1 ]; then
+    tmux show-options -t "=$1:" -qv @tmmx_host
+  else
+    printf 'local\n'
+  fi
+}
+
 # Per-wrapper state (last inner session) lives under this directory so a restored
 # wrapper can reconnect straight to the session it was on.
 tmmx_state_dir() { printf '%s\n' "${TMMX_STATE_DIR:-$HOME/.local/share/tmmx}"; }

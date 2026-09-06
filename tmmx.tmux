@@ -17,6 +17,10 @@ previous_previous_key=$(tmux show-options -gqv @tmmx_bound_previous_key)
 forwarded_outer_prefix=$(printf '%s' "$outer_prefix" | sed 's/\\/\\\\/g')
 forwarded_manager_key=$(printf '%s' "$manager_key" | sed 's/\\/\\\\/g')
 forwarded_previous_key=$(printf '%s' "$previous_key" | sed 's/\\/\\\\/g')
+# Host-scoped previous switch. run-shell expands #{client_session}/#{client_tty};
+# the script has no client of its own, so they are passed in.
+scope_across="run-shell \"TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/switch-scope.sh' across '#{client_session}' '#{client_tty}'\""
+scope_host="run-shell \"TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/switch-scope.sh' host '#{client_session}' '#{client_tty}'\""
 manager_popup="TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/popup.sh' '#{client_tty}' manager"
 
 tmux set-option -g @tmmx_path "$CURRENT_DIR"
@@ -32,7 +36,7 @@ tmux set-option -s extended-keys on
 tmux bind-key -n "$outer_prefix" if-shell -F '#{==:#{@tmmx_remote},1}' 'switch-client -T tmmx-outer' 'switch-client -T prefix'
 tmux bind-key "$picker_key" run-shell -b "TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/popup.sh' '#{client_tty}' picker"
 tmux bind-key "$manager_picker_key" run-shell -b "$manager_popup"
-tmux bind-key Space switch-client -l
+tmux bind-key Space "$scope_host"
 tmux unbind-key -a -T tmmx-outer 2>/dev/null || true
 tmux bind-key -T tmmx-outer "$manager_picker_key" run-shell -b "$manager_popup"
 forward() { [ "$1" = "$manager_picker_key" ] || tmux bind-key -T tmmx-outer "$1" send-keys "$outer_prefix" "$1"; }
@@ -63,7 +67,7 @@ tmux set-option -g @tmmx_bound_manager_key "$manager_key"
 tmux set-option -g @tmmx_bound_manager_picker_key "$manager_picker_key"
 # Previous manager-level session: works from every managed session, including
 # remote wrappers, because it is handled locally before the pane sees it.
-tmux bind-key -n "$previous_key" if-shell -F '#{==:#{@tmmx_managed},1}' 'switch-client -l' "send-keys $forwarded_previous_key"
+tmux bind-key -n "$previous_key" if-shell -F '#{==:#{@tmmx_managed},1}' "$scope_across" "send-keys $forwarded_previous_key"
 tmux set-option -g @tmmx_bound_previous_key "$previous_key"
 # One-handed scoped previous switch: the nav key (default Ctrl-`) then a digit —
 # 1 previous window in the session, 2 previous session on this host, 3 previous
@@ -78,8 +82,8 @@ if [ -n "$previous_nav_key" ] && [ "$previous_nav_key" != "$nav_key" ]; then tmu
 tmux bind-key -n "$nav_key" if-shell -F '#{==:#{@tmmx_managed},1}' 'switch-client -T tmmx-nav' "send-keys $forwarded_nav_key"
 tmux unbind-key -a -T tmmx-nav 2>/dev/null || true
 tmux bind-key -T tmmx-nav 1 if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix Tab" 'last-window'
-tmux bind-key -T tmmx-nav 2 if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix Space" 'switch-client -l'
-tmux bind-key -T tmmx-nav 3 switch-client -l
+tmux bind-key -T tmmx-nav 2 if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix Space" "$scope_host"
+tmux bind-key -T tmmx-nav 3 "$scope_across"
 tmux set-option -g @tmmx_bound_nav_key "$nav_key"
 tmux bind-key -T tmmx-prefix "$manager_picker_key" run-shell -b "$manager_popup" \; switch-client -T root
 tmux bind-key -T tmmx-prefix Tab switch-client -l
