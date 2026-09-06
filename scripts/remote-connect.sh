@@ -6,6 +6,12 @@ host=$1
 inner=${2:-}
 . "$TMMX_DIR/scripts/common.sh"
 
+# Per-host connection log, so a dropped or refused session leaves a trace.
+tmmx_log_dir="$(tmmx_state_dir)/logs"
+mkdir -p "$tmmx_log_dir" 2>/dev/null || true
+tmmx_log_file="$tmmx_log_dir/$(tmmx_inner_key "$host").log"
+log() { printf '%s pid=%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$$" "$*" >> "$tmmx_log_file" 2>/dev/null || true; }
+
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 # tmmx always supplies its own remote command, so a RemoteCommand or forced
 # RequestTTY from a matching Host entry must not apply. Other options do.
@@ -42,6 +48,15 @@ reconnect_max=$(tmux show-options -gqv @tmmx_reconnect_max)
 case "$reconnect_max" in ''|*[!0-9]*) reconnect_max=60 ;; esac
 [ "$reconnect_max" -ge "$reconnect_delay" ] || reconnect_max=$reconnect_delay
 backoff=$reconnect_delay
+# SSH keepalive for the interactive attach: detects a truly dead link (sleeping
+# laptop, dropped Wi-Fi) so the loop can reconnect, WITHOUT dropping a healthy
+# session on a brief stall. ServerAliveCountMax=1 with a 5s interval did the
+# latter constantly; the defaults tolerate ~45s of silence before giving up.
+alive_interval=$(tmux show-options -gqv @tmmx_server_alive_interval)
+case "$alive_interval" in ''|*[!0-9]*) alive_interval=15 ;; esac
+alive_count=$(tmux show-options -gqv @tmmx_server_alive_count)
+case "$alive_count" in ''|*[!0-9]*) alive_count=3 ;; esac
+log "start inner='$inner' auto_reconnect=$auto_reconnect delay=${reconnect_delay}s max=${reconnect_max}s keepalive=${alive_interval}s x${alive_count}"
 
 reconnecting() {
   printf '\033[2J\033[HConnection to %s lost. Reconnecting in %ss…\nPress Ctrl-c to stop.\n' "$host" "$backoff"
@@ -96,10 +111,12 @@ restore_if_needed() {
 # to come back exactly like a dropped connection does.
 while ! discover_tmux; do
   printf 'Could not find tmux on %s. Set TMMX_REMOTE_TMUX to its path if necessary.\n' "$host" >&2
+  log "discovery failed (no tmux / host unreachable)"
   if [ "$auto_reconnect" = 1 ]; then reconnecting; continue; fi
   pause_before_exit
   exit 1
 done
+log "discovered remote tmux: $remote_tmux_bin"
 reset_backoff
 
 first_direct=$inner
@@ -114,7 +131,8 @@ while :; do
     status=$?
     sessions=$(printf '%s\n' "$session_output" | sed -n 's/^__TMMX_SESSION__//p')
     if [ "$status" -ne 0 ] && ! tmmx_no_server_error <"$error_file"; then
-      printf 'Could not list tmux sessions on %s.\n' "$host" >&2; sed -n '1,3p' "$error_file" >&2; rm -f "$error_file"
+      printf 'Could not list tmux sessions on %s.\n' "$host" >&2; sed -n '1,3p' "$error_file" >&2
+      log "listing failed status=$status stderr=$(sed -n '1,2p' "$error_file" | tr '\n' ' ')"; rm -f "$error_file"
       if [ "$auto_reconnect" = 1 ]; then reconnecting; continue; fi
       pause_before_exit; exit 1
     fi
@@ -139,16 +157,18 @@ while :; do
   while :; do
     [ "$recovering" = 1 ] && restore_if_needed "$session"
     error_file=$(mktemp "${TMPDIR:-/tmp}/tmmx.XXXXXX") || exit 1
+    log "attach session='$session'"
     if [ "$auto_reconnect" = 1 ]; then
       # A dropped Wi-Fi or sleeping laptop can leave TCP half-open indefinitely.
-      # Probes make SSH return its normal transport-failure status so this loop
-      # can reconnect, without changing the default non-reconnecting behavior.
-      ssh_tty -o ServerAliveInterval=5 -o ServerAliveCountMax=1 "$host" "$attach_command $(quote "$session")" 2>"$error_file"
+      # Keepalive probes make SSH return its normal transport-failure status so
+      # this loop can reconnect, without changing the default behavior.
+      ssh_tty -o ServerAliveInterval="$alive_interval" -o ServerAliveCountMax="$alive_count" "$host" "$attach_command $(quote "$session")" 2>"$error_file"
     else
       ssh_tty "$host" "$attach_command $(quote "$session")" 2>"$error_file"
     fi
     status=$?
-    if [ "$status" -eq 255 ] && [ "$auto_reconnect" = 1 ]; then rm -f "$error_file"; reconnecting; recovering=1; continue; fi
+    log "attach exited status=$status$([ "$status" -ne 0 ] && [ -s "$error_file" ] && printf ' stderr=%s' "$(sed -n '1,2p' "$error_file" | tr '\n' ' ')")"
+    if [ "$status" -eq 255 ] && [ "$auto_reconnect" = 1 ]; then rm -f "$error_file"; log "transport failure; reconnecting after ${backoff}s"; reconnecting; recovering=1; continue; fi
     rm -f "$error_file"
     reset_backoff
     break
