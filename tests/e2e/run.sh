@@ -27,8 +27,10 @@ export TMMX_E2E_SIGNALS_DIR="$signals_dir"
 compose up --build --wait host
 (
   set -x
+  # The tester runs every earlier case before it reaches the recovery step, so
+  # this deadline must cover the whole suite, not just one connection attempt.
   attempt=0
-  while [ ! -f "$signals_dir/recovery-attached" ] && [ "$attempt" -lt 300 ]; do attempt=$((attempt + 1)); sleep 0.1; done
+  while [ ! -f "$signals_dir/recovery-attached" ] && [ "$attempt" -lt 1800 ]; do attempt=$((attempt + 1)); sleep 0.1; done
   [ -f "$signals_dir/recovery-attached" ] || exit 1
   # A graceful `restart` lets tmux close its client normally, which is
   # indistinguishable from intentionally ending a remote session. Recreate the

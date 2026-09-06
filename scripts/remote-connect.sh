@@ -4,22 +4,34 @@ host=$1
 . "$TMMX_DIR/scripts/common.sh"
 
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+# tmmx always supplies its own remote command, so a RemoteCommand or forced
+# RequestTTY from a matching Host entry must not apply. Other options do.
+ssh_batch() { ssh -o RemoteCommand=none -o RequestTTY=no "$@"; }
+ssh_tty() { ssh -t -o RemoteCommand=none "$@"; }
+# A wrapper session closes as soon as this script exits, so a fatal error must
+# stay on screen until the user has read it.
+pause_before_exit() {
+  [ -r /dev/tty ] || return 0
+  printf 'Press Enter to close.\n' >&2
+  IFS= read -r _ </dev/tty 2>/dev/null || true
+}
 remote_tmux_bin=${TMMX_REMOTE_TMUX:-}
 remote_preamble='PATH=$HOME/.local/bin:$HOME/bin:$PATH; export PATH; for tmmx_locale in C.utf8 C.UTF-8 en_US.utf8 en_US.UTF-8; do if locale -a 2>/dev/null | grep -qx "$tmmx_locale"; then export LC_ALL="$tmmx_locale"; break; fi; done; '
 
 if [ -z "$remote_tmux_bin" ]; then
-  remote_tmux_bin=$(ssh "$host" 'PATH=$HOME/.local/bin:$HOME/bin:$PATH; export PATH; tmmx_tmux=$(command -v tmux || { command -v zsh >/dev/null 2>&1 && zsh -ic "command -v tmux" 2>/dev/null | sed -n "/^\\//{p;q;}"; }); [ -n "$tmmx_tmux" ] && printf "__TMMX_BIN__%s\\n" "$tmmx_tmux"' | sed -n 's/^__TMMX_BIN__//p' | sed -n '1p')
+  remote_tmux_bin=$(ssh_batch "$host" 'PATH=$HOME/.local/bin:$HOME/bin:$PATH; export PATH; tmmx_tmux=$(command -v tmux || { command -v zsh >/dev/null 2>&1 && zsh -ic "command -v tmux" 2>/dev/null | sed -n "/^\\//{p;q;}"; }); [ -n "$tmmx_tmux" ] && printf "__TMMX_BIN__%s\\n" "$tmmx_tmux"' | sed -n 's/^__TMMX_BIN__//p' | sed -n '1p')
 fi
 
 [ -n "$remote_tmux_bin" ] || {
   printf 'Could not find tmux on %s. Set TMMX_REMOTE_TMUX to its path if necessary.\n' "$host" >&2
+  pause_before_exit
   exit 1
 }
 
 remote_tmux() {
   remote_command="$remote_preamble exec $(quote "$remote_tmux_bin")"
   for argument in "$@"; do remote_command="$remote_command $(quote "$argument")"; done
-  ssh "$host" "$remote_command"
+  ssh_batch "$host" "$remote_command"
 }
 
 remote_sessions() {
@@ -74,7 +86,7 @@ while :; do
   session_output=$(remote_sessions 2>"$error_file")
   status=$?
   sessions=$(printf '%s\n' "$session_output" | sed -n 's/^__TMMX_SESSION__//p')
-  if [ "$status" -ne 0 ] && ! tmmx_no_server_error <"$error_file"; then printf 'Could not list tmux sessions on %s.\n' "$host" >&2; sed -n '1,3p' "$error_file" >&2; rm -f "$error_file"; exit 1; fi
+  if [ "$status" -ne 0 ] && ! tmmx_no_server_error <"$error_file"; then printf 'Could not list tmux sessions on %s.\n' "$host" >&2; sed -n '1,3p' "$error_file" >&2; rm -f "$error_file"; pause_before_exit; exit 1; fi
   rm -f "$error_file"
   if [ -n "$sessions" ]; then
     result=$(printf '%s\n' "$sessions" | sort -t '|' -k1,1nr | while IFS='|' read -r last_attached remote_session; do printf '%s\t%s\t%s\t%s\n' "$remote_session" "$last_attached" "$(tmmx_format_timestamp "$last_attached")" "$remote_session"; done | tmmx_fzf remote "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/remote-kill-session.sh' '$host' '$remote_tmux_bin' {3}" || true)
@@ -96,9 +108,9 @@ while :; do
       # A dropped Wi-Fi or sleeping laptop can leave TCP half-open indefinitely.
       # Probes make SSH return its normal transport-failure status so this loop
       # can reconnect, without changing the default non-reconnecting behavior.
-      ssh -t -o ServerAliveInterval=5 -o ServerAliveCountMax=1 "$host" "$attach_command $(quote "$session")" 2>"$error_file"
+      ssh_tty -o ServerAliveInterval=5 -o ServerAliveCountMax=1 "$host" "$attach_command $(quote "$session")" 2>"$error_file"
     else
-      ssh -t "$host" "$attach_command $(quote "$session")" 2>"$error_file"
+      ssh_tty "$host" "$attach_command $(quote "$session")" 2>"$error_file"
     fi
     status=$?
     if [ "$status" -eq 255 ] && [ "$auto_reconnect" = 1 ]; then rm -f "$error_file"; reconnecting; recovering=1; continue; fi
