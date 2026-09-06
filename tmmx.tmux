@@ -25,6 +25,9 @@ manager_popup="TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/popup.sh' '#{cli
 
 tmux set-option -g @tmmx_path "$CURRENT_DIR"
 tmux set-option -s set-clipboard on
+# Closing the attached session should keep you in tmmx (switch to your most
+# recent other session) instead of detaching the client and dropping out.
+tmux set-option -g detach-on-destroy off
 tmux set-option -as terminal-features ',screen*:clipboard,alacritty:clipboard,alacritty:extkeys'
 # Ctrl-Tab and similar chords only reach tmux as distinct keys when it asks the
 # terminal for extended key reporting.

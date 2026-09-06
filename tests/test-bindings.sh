@@ -71,4 +71,8 @@ for d in 1 2 3; do
   }
 done
 
+# Closing the current session must not drop the user out of tmmx.
+dod=$(tmux show-options -gv detach-on-destroy 2>/dev/null)
+[ "$dod" = "off" ] || { printf 'FAIL: detach-on-destroy is [%s], expected off\n' "$dod" >&2; exit 1; }
+
 printf 'test-bindings: ok\n'
