@@ -30,6 +30,7 @@ Install the plugin on remote hosts as well when you want `Ctrl-\ f`, clipboard f
 
 - `Ctrl-\ w`: open the manager picker. Type `name` for a local session, `@host` for an SSH-backed tmux session, or `ssh user@host` to connect as a specific SSH user.
 - `Ctrl-Tab`: switch to the previous manager-level session. Works from every managed session, including remote wrappers.
+- `Ctrl-`` then `1`/`2`/`3`: one-handed scoped previous switch — `1` previous window in the session, `2` previous session on this host, `3` previous session across hosts. In a remote wrapper `1` and `2` act on that host. Set the prefix with `@tmmx_nav_key`.
 - `Ctrl-\ f`: open a create-or-switch picker for the current tmux server.
 - `Ctrl-\ Tab`, `Ctrl-\ Space`, or `Ctrl-\ Ctrl-Tab`: switch to the previous session on the current tmux server.
 - `Ctrl-q w` and `Ctrl-q Tab`: the same manager picker and previous manager-level session, on the manager key table.
@@ -70,6 +71,7 @@ set -g @tmmx_manager_key 'C-q'
 set -g @tmmx_picker_key 'f'
 set -g @tmmx_manager_picker_key 'w'
 set -g @tmmx_previous_key 'C-Tab'
+set -g @tmmx_nav_key 'C-`'
 set -g @tmmx_manager_local_sessions 'all' # or 'host' for one @local-host row
 set -g @tmmx_popup_width '60%'
 set -g @tmmx_popup_height '50%'
@@ -88,6 +90,8 @@ tmmx turns on tmux's `extended-keys` option so that chords such as `Ctrl-Tab` ar
 The outer prefix is an additional tmux root binding. It opens the local prefix table in local sessions. In managed SSH wrappers it opens a table where the manager picker key is handled locally and every other key is forwarded to the remote tmux after the outer prefix.
 
 `@tmmx_auto_reconnect` retries a managed SSH connection after a network drop and uses a five-second SSH keepalive so a half-open connection is detected. With `@tmmx_auto_restore` enabled, a recovered host with no tmux server is bootstrapped and its configured `@resurrect-restore-script-path` is invoked before tmmx reattaches. Restore is attempted once per outage and waits up to `@tmmx_restore_grace` seconds for the requested session.
+
+After a tmux-resurrect restore, a managed remote wrapper comes back as a plain shell because resurrect does not re-run its ssh. tmmx reopens it: switching to such a wrapper reconnects it on the spot, straight to the remote session it was on (tmmx remembers each wrapper's last session under `~/.local/share/tmmx`, override with `TMMX_STATE_DIR`). With `@tmmx_auto_reconnect` on, restored wrappers are also reopened in the background after the restore, one at a time, without waiting for you to visit them.
 
 Automatic reconnect and restore are reliable only when SSH authentication is non-interactive: an agent-loaded key, an unprotected key, or a key whose passphrase is already cached. This applies equally to `@host` and `ssh user@host` targets, and the key can come from the host's `Host` entry. A password or passphrase prompt during a reconnect attempt blocks the wrapper until it is answered.
 

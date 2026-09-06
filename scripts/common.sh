@@ -213,6 +213,43 @@ tmmx_remote_session_name() { printf '__tmmx_remote__%s\n' "$(tmmx_encode_destina
 tmmx_valid_session_name() { forbidden=$(printf '\t|'); [ -n "$1" ] && [ "$(printf '%s' "$1" | tr -d "$forbidden")" = "$1" ]; }
 tmmx_no_server_error() { grep -Eq 'no server running|error connecting to .*No such file or directory'; }
 
+# A session's host: its @tmmx_host for a remote wrapper, otherwise "local".
+tmmx_session_host() {
+  if [ "$(tmux show-options -t "=$1:" -qv @tmmx_remote 2>/dev/null)" = 1 ]; then
+    tmux show-options -t "=$1:" -qv @tmmx_host
+  else
+    printf 'local\n'
+  fi
+}
+
+# Per-wrapper state (last inner session) lives under this directory so a restored
+# wrapper can reconnect straight to the session it was on.
+tmmx_state_dir() { printf '%s\n' "${TMMX_STATE_DIR:-$HOME/.local/share/tmmx}"; }
+tmmx_inner_key() { printf '%s\n' "$1" | tr '/ ' '__'; }
+tmmx_inner_file() { printf '%s/inner/%s\n' "$(tmmx_state_dir)" "$(tmmx_inner_key "$1")"; }
+tmmx_remember_inner() {
+  dir="$(tmmx_state_dir)/inner"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  printf '%s\n' "$2" > "$dir/$(tmmx_inner_key "$1")" 2>/dev/null || true
+}
+tmmx_recall_inner() { f=$(tmmx_inner_file "$1"); [ -f "$f" ] && sed -n '1p' "$f"; }
+
+# True when the connection wrapper (remote-connect.sh) is running at or below pid.
+tmmx_pane_connected() {
+  queue=$1
+  while [ -n "$queue" ]; do
+    next=
+    for pane_proc in $queue; do
+      case "$(ps -o command= -p "$pane_proc" 2>/dev/null)" in
+        *remote-connect.sh*) return 0 ;;
+      esac
+      next="$next $(pgrep -P "$pane_proc" 2>/dev/null | tr '\n' ' ')"
+    done
+    queue=$next
+  done
+  return 1
+}
+
 tmmx_find_remote() {
   requested_host=$1
   separator='|'
