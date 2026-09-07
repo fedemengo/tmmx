@@ -78,7 +78,7 @@ set -g @tmmx_popup_height '50%'
 set -g @tmmx_auto_reconnect 'off'
 set -g @tmmx_reconnect_delay 2
 set -g @tmmx_reconnect_max 60
-set -g @tmmx_server_alive_interval 15
+set -g @tmmx_server_alive_interval 5
 set -g @tmmx_server_alive_count 3
 set -g @tmmx_auto_restore 'off'
 set -g @tmmx_restore_grace 5
@@ -96,7 +96,7 @@ The outer prefix is an additional tmux root binding. It opens the local prefix t
 
 After a tmux-resurrect restore, a managed remote wrapper comes back as a plain shell because resurrect does not re-run its ssh. tmmx reopens it: switching to such a wrapper reconnects it on the spot, straight to the remote session it was on (tmmx remembers each wrapper's last session under `~/.local/share/tmmx`, override with `TMMX_STATE_DIR`). With `@tmmx_auto_reconnect` on, restored wrappers are also reopened in the background after the restore, one at a time, without waiting for you to visit them.
 
-A live remote attach uses an SSH keepalive (`@tmmx_server_alive_interval` seconds, `@tmmx_server_alive_count` probes; ~45s of silence by default) to notice a truly dead link so it can reconnect, without dropping a healthy session on a brief stall. Reconnect attempts back off from `@tmmx_reconnect_delay` up to `@tmmx_reconnect_max`. Each managed connection appends events to `~/.local/share/tmmx/logs/<host>.log` (override the directory with `TMMX_STATE_DIR`).
+A live remote attach uses an SSH keepalive (`@tmmx_server_alive_interval` seconds, `@tmmx_server_alive_count` probes; ~15s of silence by default) to notice a truly dead link so it can reconnect, without dropping a healthy session on a brief stall. Reconnect attempts back off from `@tmmx_reconnect_delay` up to `@tmmx_reconnect_max`. Each managed connection appends events to `~/.local/share/tmmx/logs/<host>.log` (override the directory with `TMMX_STATE_DIR`).
 
 Automatic reconnect and restore are reliable only when SSH authentication is non-interactive: an agent-loaded key, an unprotected key, or a key whose passphrase is already cached. This applies equally to `@host` and `ssh user@host` targets, and the key can come from the host's `Host` entry. A password or passphrase prompt during a reconnect attempt blocks the wrapper until it is answered.
 

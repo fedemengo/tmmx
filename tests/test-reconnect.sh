@@ -51,7 +51,7 @@ count=$(printf '%s\n' "$attach" | sed -n 's/.*ServerAliveCountMax=\([0-9][0-9]*\
 
 # CountMax=1 means a single missed probe drops the session — the regression.
 [ "$count" -gt 1 ] || { printf 'FAIL: ServerAliveCountMax=%s is too aggressive (must be >1)\n' "$count" >&2; exit 1; }
-# Require at least ~30s of tolerated silence before SSH gives up.
-[ "$((interval * count))" -ge 30 ] || { printf 'FAIL: keepalive tolerance %ss too short (interval %s x count %s)\n' "$((interval*count))" "$interval" "$count" >&2; exit 1; }
+# Require at least ~15s of tolerated silence before SSH gives up (5x1=5s was the bug).
+[ "$((interval * count))" -ge 15 ] || { printf 'FAIL: keepalive tolerance %ss too short (interval %s x count %s)\n' "$((interval*count))" "$interval" "$count" >&2; exit 1; }
 
 printf 'test-reconnect: ok (keepalive %ss x %s = %ss tolerance)\n' "$interval" "$count" "$((interval*count))"

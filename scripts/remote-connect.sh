@@ -50,12 +50,16 @@ case "$reconnect_max" in ''|*[!0-9]*) reconnect_max=60 ;; esac
 backoff=$reconnect_delay
 # SSH keepalive for the interactive attach: detects a truly dead link (sleeping
 # laptop, dropped Wi-Fi) so the loop can reconnect, WITHOUT dropping a healthy
-# session on a brief stall. ServerAliveCountMax=1 with a 5s interval did the
-# latter constantly; the defaults tolerate ~45s of silence before giving up.
+# session on a brief stall. ServerAliveCountMax=1 with a 5s interval dropped
+# healthy sessions constantly; the defaults tolerate ~15s of silence before
+# giving up — long enough to ride out a blip, short enough not to freeze.
 alive_interval=$(tmux show-options -gqv @tmmx_server_alive_interval)
-case "$alive_interval" in ''|*[!0-9]*) alive_interval=15 ;; esac
+case "$alive_interval" in ''|*[!0-9]*) alive_interval=5 ;; esac
 alive_count=$(tmux show-options -gqv @tmmx_server_alive_count)
 case "$alive_count" in ''|*[!0-9]*) alive_count=3 ;; esac
+# A session that stayed up at least this long counts as a healthy connection, so
+# a later drop resets the backoff instead of inheriting a delay grown earlier.
+healthy_after=$((alive_interval * alive_count * 2))
 log "start inner='$inner' auto_reconnect=$auto_reconnect delay=${reconnect_delay}s max=${reconnect_max}s keepalive=${alive_interval}s x${alive_count}"
 
 reconnecting() {
@@ -158,6 +162,7 @@ while :; do
     [ "$recovering" = 1 ] && restore_if_needed "$session"
     error_file=$(mktemp "${TMPDIR:-/tmp}/tmmx.XXXXXX") || exit 1
     log "attach session='$session'"
+    attach_start=$(date +%s 2>/dev/null || printf 0)
     if [ "$auto_reconnect" = 1 ]; then
       # A dropped Wi-Fi or sleeping laptop can leave TCP half-open indefinitely.
       # Keepalive probes make SSH return its normal transport-failure status so
@@ -167,7 +172,11 @@ while :; do
       ssh_tty "$host" "$attach_command $(quote "$session")" 2>"$error_file"
     fi
     status=$?
-    log "attach exited status=$status$([ "$status" -ne 0 ] && [ -s "$error_file" ] && printf ' stderr=%s' "$(sed -n '1,2p' "$error_file" | tr '\n' ' ')")"
+    attach_elapsed=$(( $(date +%s 2>/dev/null || printf 0) - attach_start ))
+    log "attach exited status=$status after ${attach_elapsed}s$([ "$status" -ne 0 ] && [ -s "$error_file" ] && printf ' stderr=%s' "$(sed -n '1,2p' "$error_file" | tr '\n' ' ')")"
+    # A connection that actually worked for a while is forward progress: reset the
+    # backoff so a later drop reconnects quickly rather than at the grown delay.
+    [ "$attach_elapsed" -ge "$healthy_after" ] && reset_backoff
     if [ "$status" -eq 255 ] && [ "$auto_reconnect" = 1 ]; then rm -f "$error_file"; log "transport failure; reconnecting after ${backoff}s"; reconnecting; recovering=1; continue; fi
     rm -f "$error_file"
     reset_backoff
