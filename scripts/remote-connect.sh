@@ -62,8 +62,22 @@ case "$alive_count" in ''|*[!0-9]*) alive_count=3 ;; esac
 healthy_after=$((alive_interval * alive_count * 2))
 log "start inner='$inner' auto_reconnect=$auto_reconnect delay=${reconnect_delay}s max=${reconnect_max}s keepalive=${alive_interval}s x${alive_count}"
 
+# Discard input (keystrokes and mouse-tracking sequences) that buffered in the
+# terminal during an outage, so it does not flood the reconnected session as
+# garbage. Non-canonical min 0 time 0 makes the reads return immediately.
+flush_tty() {
+  [ -r /dev/tty ] && [ -w /dev/tty ] || return 0
+  saved=$(stty -g </dev/tty 2>/dev/null) || return 0
+  stty -icanon min 0 time 0 </dev/tty 2>/dev/null
+  i=0
+  while [ "$i" -lt 4 ]; do dd bs=65536 count=1 </dev/tty >/dev/null 2>&1; i=$((i + 1)); done
+  stty "$saved" </dev/tty 2>/dev/null
+}
+
 reconnecting() {
-  printf '\033[2J\033[HConnection to %s lost. Reconnecting in %ss…\nPress Ctrl-c to stop.\n' "$host" "$backoff"
+  # \033[?100Xl turns off mouse reporting so moving the mouse during the wait
+  # stops emitting escape sequences; \033[?25h restores the cursor.
+  printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h\033[2J\033[HConnection to %s lost. Reconnecting in %ss…\nPress Ctrl-c to stop.\n' "$host" "$backoff"
   sleep "$backoff"
   backoff=$((backoff * 2))
   [ "$backoff" -le "$reconnect_max" ] || backoff=$reconnect_max
@@ -160,6 +174,8 @@ while :; do
   recovering=0
   while :; do
     [ "$recovering" = 1 ] && restore_if_needed "$session"
+    # Drop anything typed / moused during the outage right before reattaching.
+    [ "$recovering" = 1 ] && flush_tty
     error_file=$(mktemp "${TMPDIR:-/tmp}/tmmx.XXXXXX") || exit 1
     log "attach session='$session'"
     attach_start=$(date +%s 2>/dev/null || printf 0)
