@@ -190,13 +190,13 @@ tmmx_run_fzf() {
   code=33
   while [ "$code" -le 126 ]; do
     key=$(printf "\\$(printf '%03o' "$code")")
-    case "$key" in j|k|g|G|i|@) ;; *) set -- "$@" --bind "$key:ignore" ;; esac
+    case "$key" in j|k|g|G|i|a|@) ;; *) set -- "$@" --bind "$key:ignore" ;; esac
     code=$((code + 1))
   done
   fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2 --tabstop=1 --print-query \
     --bind "j:down,k:up,g:first,G:last,ctrl-d:half-page-down,ctrl-u:half-page-up,ctrl-f:page-down,ctrl-b:page-up,enter:accept$kill_binding$reload_binding$start_binding" \
     --bind "tab:transform-query(printf %s {1} | sed 's/[[:space:]]*\$//')" \
-    --bind "i:$insert_mode" --bind "@:$insert_mode+put(@)" --bind "ctrl-j:$scroll_mode" --bind 'space:ignore' "$@"
+    --bind "i:$insert_mode" --bind "a:$insert_mode" --bind "@:$insert_mode+put(@)" --bind "ctrl-j:$scroll_mode" --bind 'space:ignore' "$@"
 }
 
 tmmx_query() { printf '%s\n' "$1" | sed -n '1p'; }
