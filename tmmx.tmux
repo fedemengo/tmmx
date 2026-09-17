@@ -87,6 +87,9 @@ tmux unbind-key -a -T tmmx-nav 2>/dev/null || true
 tmux bind-key -T tmmx-nav 1 if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix Tab" 'last-window'
 tmux bind-key -T tmmx-nav 2 if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix Space" "$scope_host"
 tmux bind-key -T tmmx-nav 3 "$scope_across"
+# Pickers on the nav hub: w selects a host (manager), e selects a session.
+tmux bind-key -T tmmx-nav w run-shell -b "$manager_popup"
+tmux bind-key -T tmmx-nav e run-shell -b "TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/popup.sh' '#{client_tty}' picker"
 tmux set-option -g @tmmx_bound_nav_key "$nav_key"
 tmux bind-key -T tmmx-prefix "$manager_picker_key" run-shell -b "$manager_popup" \; switch-client -T root
 tmux bind-key -T tmmx-prefix Tab switch-client -l
