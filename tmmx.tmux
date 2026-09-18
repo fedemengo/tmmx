@@ -22,6 +22,7 @@ forwarded_previous_key=$(printf '%s' "$previous_key" | sed 's/\\/\\\\/g')
 scope_across="run-shell \"TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/switch-scope.sh' across '#{client_session}' '#{client_tty}'\""
 scope_host="run-shell \"TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/switch-scope.sh' host '#{client_session}' '#{client_tty}'\""
 manager_popup="TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/popup.sh' '#{client_tty}' manager"
+picker_popup="TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/popup.sh' '#{client_tty}' picker"
 
 tmux set-option -g @tmmx_path "$CURRENT_DIR"
 tmux set-option -s set-clipboard on
@@ -87,9 +88,11 @@ tmux unbind-key -a -T tmmx-nav 2>/dev/null || true
 tmux bind-key -T tmmx-nav 1 if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix Tab" 'last-window'
 tmux bind-key -T tmmx-nav 2 if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix Space" "$scope_host"
 tmux bind-key -T tmmx-nav 3 "$scope_across"
-# Pickers on the nav hub: w selects a host (manager), e selects a session.
+# Pickers on the nav hub: w selects a host (manager, always manager-local); e
+# selects a session on the current host — forwarded into a remote wrapper so it
+# lists that host's sessions, exactly like the C-` 2 nav does.
 tmux bind-key -T tmmx-nav w run-shell -b "$manager_popup"
-tmux bind-key -T tmmx-nav e run-shell -b "TMMX_DIR='$CURRENT_DIR' sh '$CURRENT_DIR/scripts/popup.sh' '#{client_tty}' picker"
+tmux bind-key -T tmmx-nav e if-shell -F '#{==:#{@tmmx_remote},1}' "send-keys $forwarded_outer_prefix $picker_key" "run-shell -b \"$picker_popup\""
 tmux set-option -g @tmmx_bound_nav_key "$nav_key"
 tmux bind-key -T tmmx-prefix "$manager_picker_key" run-shell -b "$manager_popup" \; switch-client -T root
 tmux bind-key -T tmmx-prefix Tab switch-client -l
