@@ -23,15 +23,15 @@ case "$*" in
 esac
 EOF
 
-# Stub ssh: discovery returns a tmux path; listing reports no server (so the
-# picker is skipped); the attach records its args and returns cleanly.
+# Stub ssh: discovery returns a tmux path; the interactive attach (the only call
+# carrying keepalive options) records its args and returns cleanly.
 cat > "$BIN/ssh" <<EOF
 #!/bin/sh
 printf '%s\n' "\$*" >> "$WORK/ssh.log"
 case "\$*" in
   *__TMMX_BIN__*|*'command -v tmux'*) printf '__TMMX_BIN__/usr/bin/tmux\n'; exit 0 ;;
+  *ServerAliveInterval*) exit 0 ;;
   *'list-sessions'*) printf 'no server running\n' >&2; exit 1 ;;
-  *'new-session -A'*) exit 0 ;;
   *) exit 0 ;;
 esac
 EOF
@@ -42,7 +42,7 @@ chmod +x "$BIN/tmux" "$BIN/ssh"
 PATH="$BIN:$PATH" TMMX_DIR="$ROOT" TMMX_STATE_DIR="$WORK/state" \
   timeout 3 sh "$ROOT/scripts/remote-connect.sh" testhost main >/dev/null 2>&1 || true
 
-attach=$(grep -m1 'new-session -A' "$WORK/ssh.log" 2>/dev/null || true)
+attach=$(grep -m1 'ServerAliveInterval' "$WORK/ssh.log" 2>/dev/null || true)
 [ -n "$attach" ] || { printf 'FAIL: no attach ssh call recorded\n' >&2; exit 1; }
 
 interval=$(printf '%s\n' "$attach" | sed -n 's/.*ServerAliveInterval=\([0-9][0-9]*\).*/\1/p')

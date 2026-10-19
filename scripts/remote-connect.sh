@@ -138,11 +138,16 @@ log "discovered remote tmux: $remote_tmux_bin"
 reset_backoff
 
 first_direct=$inner
+# explicit_pick=1 only when the user chose a session in the picker this connect;
+# that exact choice is honored. A reopen or a reconnect leaves it 0 and lands on
+# the host's most-recently-used session instead (see the attach block below).
+explicit_pick=0
 while :; do
   if [ -n "$first_direct" ]; then
-    # Reopen path: go straight to the remembered session.
+    # Reopen path: attach to the most-recently-used session, not a frozen name.
     session=$first_direct
     first_direct=
+    explicit_pick=0
   else
     error_file=$(mktemp "${TMPDIR:-/tmp}/tmmx.XXXXXX") || exit 1
     session_output=$(remote_sessions 2>"$error_file")
@@ -167,25 +172,41 @@ while :; do
     [ -n "$session" ] || exit 0
     if ! tmmx_valid_session_name "$session"; then printf 'Session names cannot contain tabs or |.\n' >&2; continue; fi
     session=$(tmmx_session_name "$session")
+    explicit_pick=1
   fi
   # Remember the session so a later reopen can attach here without the picker.
   tmmx_remember_inner "$host" "$session"
-  attach_command="$remote_preamble exec $(quote "$remote_tmux_bin") new-session -A -s"
+  rtmux=$(quote "$remote_tmux_bin")
+  qsession=$(quote "$session")
+  # Two attach forms. "named" attaches to exactly $session (creating it if
+  # missing) — used only to honor an explicit picker choice on its first attach.
+  # "recent" attaches to the host's most-recently-used session, falling back to
+  # creating $session only when the remote has no sessions at all. A reopen and
+  # every reconnect use "recent", so a dropped link puts you back on the session
+  # you were actually on instead of snapping to the frozen $session name (which is
+  # fixed for the wrapper's life, so it was usually the stale "main" first seen).
+  attach_named="$remote_preamble exec $rtmux new-session -A -s $qsession"
+  attach_recent="$remote_preamble if $rtmux list-sessions >/dev/null 2>&1; then exec $rtmux attach-session; else exec $rtmux new-session -s $qsession; fi"
   recovering=0
   while :; do
     [ "$recovering" = 1 ] && restore_if_needed "$session"
     # Drop anything typed / moused during the outage right before reattaching.
     [ "$recovering" = 1 ] && flush_tty
+    if [ "$recovering" = 0 ] && [ "$explicit_pick" = 1 ]; then
+      remote_cmd=$attach_named; attach_mode=named
+    else
+      remote_cmd=$attach_recent; attach_mode=recent
+    fi
     error_file=$(mktemp "${TMPDIR:-/tmp}/tmmx.XXXXXX") || exit 1
-    log "attach session='$session'"
+    log "attach mode=$attach_mode session-hint='$session'"
     attach_start=$(date +%s 2>/dev/null || printf 0)
     if [ "$auto_reconnect" = 1 ]; then
       # A dropped Wi-Fi or sleeping laptop can leave TCP half-open indefinitely.
       # Keepalive probes make SSH return its normal transport-failure status so
       # this loop can reconnect, without changing the default behavior.
-      ssh_tty -o ServerAliveInterval="$alive_interval" -o ServerAliveCountMax="$alive_count" "$host" "$attach_command $(quote "$session")" 2>"$error_file"
+      ssh_tty -o ServerAliveInterval="$alive_interval" -o ServerAliveCountMax="$alive_count" "$host" "$remote_cmd" 2>"$error_file"
     else
-      ssh_tty "$host" "$attach_command $(quote "$session")" 2>"$error_file"
+      ssh_tty "$host" "$remote_cmd" 2>"$error_file"
     fi
     status=$?
     attach_elapsed=$(( $(date +%s 2>/dev/null || printf 0) - attach_start ))
