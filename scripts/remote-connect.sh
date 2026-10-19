@@ -37,6 +37,17 @@ reconnect_delay=$(tmux show-options -gqv @tmmx_reconnect_delay)
 case "$reconnect_delay" in ''|*[!0-9]*) reconnect_delay=2 ;; esac
 auto_restore=0
 option_enabled @tmmx_auto_restore && auto_restore=1
+# When an established interactive session drops, hold its last frame on screen and
+# reconnect only once you press a key, instead of wiping it the moment the link is
+# found dead. Lets you keep reading a disconnected session; the key that wakes it
+# is consumed (input to a dead link never reached the host anyway). Default on; set
+# off to reconnect eagerly. Only a session that was up at least lazy_reconnect_min
+# seconds is held, so a host that is simply down still retries in the background
+# without needing a keypress.
+lazy_reconnect=1
+case "$(tmux show-options -gqv @tmmx_reconnect_on_input)" in 0|off|false|no) lazy_reconnect=0 ;; esac
+lazy_reconnect_min=$(tmux show-options -gqv @tmmx_reconnect_on_input_min)
+case "$lazy_reconnect_min" in ''|*[!0-9]*) lazy_reconnect_min=3 ;; esac
 restore_grace=$(tmux show-options -gqv @tmmx_restore_grace)
 case "$restore_grace" in ''|*[!0-9]*) restore_grace=5 ;; esac
 restore_attempted=0
@@ -74,10 +85,29 @@ flush_tty() {
   stty "$saved" </dev/tty 2>/dev/null
 }
 
+# Block until the user presses a key. Used to hold a dropped session's last frame
+# on screen (so it stays readable) until the user actually tries to interact.
+hold_until_input() {
+  [ -r /dev/tty ] || return 0
+  saved=$(stty -g </dev/tty 2>/dev/null) || return 0
+  stty -icanon min 1 time 0 </dev/tty 2>/dev/null
+  dd bs=1 count=1 </dev/tty >/dev/null 2>&1
+  stty "$saved" </dev/tty 2>/dev/null
+}
+
+# Best-effort terminal cleanup on a drop: silence mouse reporting (\033[?100Xl)
+# so moving the mouse during the wait does not spray escape codes, and restore the
+# cursor (\033[?25h). Written straight to the terminal as control codes, never into
+# visible output, so the reconnect notice stays plain text and the dropped session's
+# last frame is left on screen (no \033[2J clear) for you to keep reading.
+tty_quiet() {
+  [ -w /dev/tty ] || return 0
+  printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h' >/dev/tty 2>/dev/null || true
+}
+
 reconnecting() {
-  # \033[?100Xl turns off mouse reporting so moving the mouse during the wait
-  # stops emitting escape sequences; \033[?25h restores the cursor.
-  printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h\033[2J\033[HConnection to %s lost. Reconnecting in %ss…\nPress Ctrl-c to stop.\n' "$host" "$backoff"
+  tty_quiet
+  printf 'Connection to %s lost. Reconnecting in %ss… (Ctrl-c to stop)\n' "$host" "$backoff"
   sleep "$backoff"
   backoff=$((backoff * 2))
   [ "$backoff" -le "$reconnect_max" ] || backoff=$reconnect_max
@@ -214,7 +244,23 @@ while :; do
     # A connection that actually worked for a while is forward progress: reset the
     # backoff so a later drop reconnects quickly rather than at the grown delay.
     [ "$attach_elapsed" -ge "$healthy_after" ] && reset_backoff
-    if [ "$status" -eq 255 ] && [ "$auto_reconnect" = 1 ]; then rm -f "$error_file"; log "transport failure; reconnecting after ${backoff}s"; reconnecting; recovering=1; continue; fi
+    if [ "$status" -eq 255 ] && [ "$auto_reconnect" = 1 ]; then
+      rm -f "$error_file"
+      recovering=1
+      if [ "$lazy_reconnect" = 1 ] && [ -r /dev/tty ] && [ "$attach_elapsed" -ge "$lazy_reconnect_min" ]; then
+        # Established session dropped: keep its last frame and wait for a keystroke,
+        # then reconnect at once (no backoff wait) now that you want to interact.
+        log "transport failure after ${attach_elapsed}s; holding last frame until input"
+        hold_until_input
+        log "input received; reconnecting now"
+        tty_quiet
+        printf 'Reconnecting…\n'
+        continue
+      fi
+      log "transport failure; reconnecting after ${backoff}s"
+      reconnecting
+      continue
+    fi
     rm -f "$error_file"
     reset_backoff
     break
