@@ -1,6 +1,6 @@
 # tmmx
 
-`tmmx` is a host-aware tmux session manager: one local tmux server that switches between local workspaces and SSH-backed remote tmux sessions.
+`tmmx` (**t**mux **m**ulti-**m**achine mu**x**er) is a host-aware tmux session manager: one local tmux server that switches between local workspaces and SSH-backed remote tmux sessions.
 
 ## Requirements
 
