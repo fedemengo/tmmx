@@ -139,9 +139,9 @@ tmmx_fzf() {
   kill_command=$2
   reload_command=$3
   case "$picker_kind" in
-    manager) title='Hosts'; footer='Ctrl-x close · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
-    remote) title='Sessions'; footer='Ctrl-x kill · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
-    *) title='Sessions'; footer='Ctrl-x kill · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
+    manager) title='Hosts'; footer='1-9 select · Ctrl-x close · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
+    remote) title='Sessions'; footer='1-9 select · Ctrl-x kill · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
+    *) title='Sessions'; footer='1-9 select · Ctrl-x kill · i or @ insert · Ctrl-j scroll · Esc cancel' ;;
   esac
   fzf_version=$(fzf --version 2>/dev/null | sed -n '1{s/[^0-9.].*$//;p;}')
   # transform-query and put(...) need fzf 0.36.
@@ -190,11 +190,26 @@ tmmx_run_fzf() {
   code=33
   while [ "$code" -le 126 ]; do
     key=$(printf "\\$(printf '%03o' "$code")")
-    case "$key" in j|k|g|G|i|a|@) ;; *) set -- "$@" --bind "$key:ignore" ;; esac
+    # Digits 1-9 are quick-select accelerators in scroll mode (see below), so they
+    # are left out of the blanket ignore bindings here, like the movement keys.
+    case "$key" in j|k|g|G|i|a|@|1|2|3|4|5|6|7|8|9) ;; *) set -- "$@" --bind "$key:ignore" ;; esac
     code=$((code + 1))
   done
+  # Scroll-mode quick-select: a digit 1-9 jumps to that row (top = 1) and accepts
+  # it at once, no Enter. Built from first+down+…+accept so it needs nothing newer
+  # than the 0.36 floor. The digits are in the mode key list, so insert mode
+  # (i/a/@) unbinds them to type normally and ctrl-j rebinds them back to select.
+  digit_binding=
+  d=1
+  while [ "$d" -le 9 ]; do
+    action=first
+    i=1
+    while [ "$i" -lt "$d" ]; do action="$action+down"; i=$((i + 1)); done
+    digit_binding="$digit_binding,$d:$action+accept"
+    d=$((d + 1))
+  done
   fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2 --tabstop=1 --print-query \
-    --bind "j:down,k:up,g:first,G:last,ctrl-d:half-page-down,ctrl-u:half-page-up,ctrl-f:page-down,ctrl-b:page-up,enter:accept$kill_binding$reload_binding$start_binding" \
+    --bind "j:down,k:up,g:first,G:last,ctrl-d:half-page-down,ctrl-u:half-page-up,ctrl-f:page-down,ctrl-b:page-up,enter:accept$kill_binding$reload_binding$start_binding$digit_binding" \
     --bind "tab:transform-query(printf %s {1} | sed 's/[[:space:]]*\$//')" \
     --bind "i:$insert_mode" --bind "a:$insert_mode" --bind "@:$insert_mode+put(@)" --bind "ctrl-j:$scroll_mode" --bind 'space:ignore' "$@"
 }

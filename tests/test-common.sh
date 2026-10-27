@@ -33,7 +33,7 @@ expected_manager_no_local=$(printf '@target-host\t30\ttime-30\tremote-wrapper\nd
 [ "$(tmmx_selection "$(printf 'query\nlabel\ttime\ttarget')")" = target ]
 ansi_escape=$(printf '\033')
 formatted=$(printf 'short\t100\ttime-1\ttarget-1\nlonger\t1\ttime-2\ttarget-2\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=30 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
-expected_formatted=$(printf '%-16s\ttime-1\ttarget-1\n%-16s\ttime-2\ttarget-2' short longer)
+expected_formatted=$(printf '%-16s\ttime-1\ttarget-1\n%-16s\ttime-2\ttarget-2' '1 short' '2 longer')
 [ "$formatted" = "$expected_formatted" ]
 
 formatted_narrow=$(printf 'short\t100\ttime-1\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=15 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
@@ -119,7 +119,7 @@ rm -rf "$config_dir"
 
 # Rows without a timestamp show their text instead of never.
 formatted_text=$(printf '@alpha\t0\tssh config\tssh:alpha\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=40 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
-[ "$formatted_text" = "$(printf '%-22s\tssh config\tssh:alpha' @alpha)" ]
+[ "$formatted_text" = "$(printf '%-22s\tssh config\tssh:alpha' '1 @alpha')" ]
 
 # Labels: @host for alias targets, user@host for explicit users. Colors match the
 # full destination first and fall back to the host part.

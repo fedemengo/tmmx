@@ -32,7 +32,8 @@ awk -F '\t' -v now="$now" -v columns="$columns" '
     for (i=1; i<=NR; i++) {
       if (epochs[i] > 0) { timestamp=colour(ages[i]) timestamps[i] "\033[0m" }
       else timestamp="\033[38;2;76;86;106m" (timestamps[i] != "" ? timestamps[i] : "never") "\033[0m"
-      label=labels[i]; label_width=widths[i]
+      prefix=(i <= 9 ? i " " : "  ")
+      label=prefix labels[i]; label_width=widths[i]+2
       if (columns > 2) {
         available=columns-8-length(timestamps[i])
         if (available < 1) { label=""; label_width=0; gap=0 }
