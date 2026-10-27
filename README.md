@@ -1,69 +1,52 @@
 # tmmx
 
-`tmmx` is a host-aware tmux session manager. It lets one local tmux server switch between local workspaces and SSH-backed remote tmux sessions.
+`tmmx` is a host-aware tmux session manager: one local tmux server that switches between local workspaces and SSH-backed remote tmux sessions.
 
 ## Requirements
 
-- tmux 3.2 or newer;
-- fzf 0.36 or newer on the local machine and each remote host where you use the picker;
-- SSH access to remote hosts.
+tmux 3.2+, fzf 0.36+ (locally and on each remote host where you use the picker), and SSH access to your remote hosts.
 
 ## Install
-
-Add tmmx to TPM:
 
 ```tmux
 set -g @plugin 'fedemengo/tmmx'
 ```
 
-Install TPM plugins, then install the launcher:
+Install TPM plugins, then the launcher:
 
 ```sh
 make -C ~/.tmux/plugins/tmmx install
 ```
 
-Run `tmmx` from a terminal to create or attach to the `~tmmx` manager session.
-
-Install the plugin on remote hosts as well when you want `Ctrl-\ f`, clipboard forwarding, and per-host session switching inside their tmux servers. Remote hosts do not need the launcher.
+Run `tmmx` to create or attach to the `~tmmx` manager session. Install the plugin (no launcher needed) on remote hosts too, for `Ctrl-\ f`, clipboard forwarding, and per-host switching inside their tmux servers.
 
 ## Controls
 
-- `Ctrl-\ w`: open the manager picker. Type `name` for a local session, `@host` for an SSH-backed tmux session, or `ssh user@host` to connect as a specific SSH user.
-- `Ctrl-Tab`: switch to the previous manager-level session. Works from every managed session, including remote wrappers.
-- `Ctrl-`` then `1`/`2`/`3`: one-handed scoped previous switch — `1` previous window in the session, `2` previous session on this host, `3` previous session across hosts. In a remote wrapper `1` and `2` act on that host. Set the prefix with `@tmmx_nav_key`.
-- `Ctrl-\ f`: open a create-or-switch picker for the current tmux server.
-- `Ctrl-\ Tab`, `Ctrl-\ Space`, or `Ctrl-\ Ctrl-Tab`: switch to the previous session on the current tmux server.
-- `Ctrl-q w` and `Ctrl-q Tab`: the same manager picker and previous manager-level session, on the manager key table.
-- `Ctrl-x`: close the highlighted local session or managed remote connection; in a remote-host picker, kill the highlighted remote session. Confirmation is required.
+- `Ctrl-\ w` — manager picker. Type `name` (local session), `@host` (SSH tmux session), or `ssh user@host` (connect as a specific user).
+- `Ctrl-\ f` — create-or-switch picker for the current tmux server.
+- `Ctrl-\ Tab` / `Ctrl-\ Space` — previous session on the current server.
+- `Ctrl-Tab` — previous manager-level session, from any managed session including remote wrappers.
+- `` Ctrl-` `` then `1`/`2`/`3` — scoped previous switch: window / session-on-host / across-hosts. In a remote wrapper `1` and `2` act on that host. Prefix set by `@tmmx_nav_key`.
+- `Ctrl-q w` / `Ctrl-q Tab` — the manager picker and previous manager-level session, on the manager key table.
+- `Ctrl-x` — close the highlighted session or remote connection (kills the remote session in a host picker). Confirmation required.
 
-Inside a managed remote wrapper, `Ctrl-\ w` still opens the local manager. Every other `Ctrl-\` chord is forwarded to the remote tmux unchanged, so `Ctrl-\ f` and `Ctrl-\ Tab` act on the remote host.
+Inside a remote wrapper, `Ctrl-\ w` opens the local manager; every other `Ctrl-\` chord is forwarded to the remote tmux, so `Ctrl-\ f` and `Ctrl-\ Tab` act there.
 
-Pickers start in scroll mode, where every printable key is ignored except the movement keys: `j` and `k` move by one row, `Ctrl-d` and `Ctrl-u` by half a page, `Ctrl-f` and `Ctrl-b` by a page, and `g` and `G` jump to the first and last row. Press `i` to enter insert mode and type, or `@` to enter insert mode with `@` already typed. `Ctrl-j` returns to scroll mode. `Tab` completes the highlighted row into the query, and `Enter` and `Esc` work in both modes.
+Pickers start in **scroll mode** (printable keys ignored except navigation): `j`/`k` row, `Ctrl-d`/`Ctrl-u` half-page, `Ctrl-f`/`Ctrl-b` page, `g`/`G` first/last, `1`–`9` jump to and select that row. `i` (or `@`) enters **insert mode** to type; `Ctrl-j` returns to scroll. `Tab` completes the highlighted row; `Enter`/`Esc` work in both modes.
 
 ## Remote workflow
 
-Typing `@target-host` in the manager creates a local wrapper session, connects with `ssh target-host`, and lets you select or create a tmux session on that host. Ending the inner remote session returns to that host’s picker; `Esc` returns to the local manager.
+Typing `@host` creates a local wrapper session, runs `ssh host`, and lets you pick or create a tmux session there. Ending the inner session returns to that host's picker; `Esc` returns to the local manager. Reconnect and reopen reattach to the session you were last on.
 
-Once the query contains `@`, the manager also lists hosts from `~/.ssh/config` below the matching sessions, marked `ssh config`. Typing `@` lists them as `@host` and typing `user@` lists them as `user@host`. Hosts that already have a wrapper are not repeated. Selecting a host row connects exactly as typing that destination would. `Include` directives are followed; wildcard patterns are skipped.
+Once the query contains `@`, the manager also lists `~/.ssh/config` hosts (marked `ssh config`) below matching sessions — `@` lists them as `@host`, `user@` as `user@host`. `Include` is followed; wildcards are skipped. Selecting one connects as typing it would.
 
-`@host` connects as the user configured for that host in your SSH configuration. To connect as a different user without adding an SSH alias, type `ssh user@host` instead. tmmx creates the same kind of wrapper session, connects with `ssh user@host`, and shows the same host session picker. The complete destination is kept for the wrapper's lifetime, so reconnect, restore, and remote kill all use it. `@host` and `ssh user@host` are separate entries in the manager: the first appears as `@host` and the second as `user@host`. `ssh host` without a user is equivalent to `@host`.
+`@host` connects as the user from your SSH config; `ssh user@host` overrides only the user (the host's `Host` entry — keys, `ProxyJump`, etc. — still applies). The full destination is kept for the wrapper's lifetime, so reconnect, restore, and remote kill all reuse it. Use `ProxyJump` for hosts behind a bastion.
 
-The `Host` entry in your SSH configuration still applies when connecting as `user@host`; the command-line user only overrides `User`. Keys, `ProxyJump`, and other options from that entry are used as usual, so no per-user alias is needed. tmmx always runs its own command over SSH, so `RemoteCommand` and `RequestTTY` from a matching entry are overridden.
-
-If the connection fails before the host picker appears, for example because the name does not resolve or tmux is missing on the host, the wrapper shows the error and waits for Enter before closing.
-
-Use SSH `ProxyJump` for hosts behind a jump host. tmmx then keeps the interactive workflow at two tmux layers.
-
-```sshconfig
-Host target-host
-  HostName target.internal
-  User remote-user
-  ProxyJump jump-host
-```
+Automatic reconnect and restore work only with non-interactive SSH auth (an agent-loaded or passphrase-cached key); a prompt blocks the wrapper until answered.
 
 ## Configuration
 
-Set these options before TPM loads tmmx to change the defaults:
+Set before TPM loads tmmx (popup size is re-read each time a picker opens; the rest at load):
 
 ```tmux
 set -g @tmmx_outer_prefix 'C-\'
@@ -72,10 +55,11 @@ set -g @tmmx_picker_key 'f'
 set -g @tmmx_manager_picker_key 'w'
 set -g @tmmx_previous_key 'C-Tab'
 set -g @tmmx_nav_key 'C-`'
-set -g @tmmx_manager_local_sessions 'all' # or 'host' for one @local-host row
+set -g @tmmx_manager_local_sessions 'all'   # or 'host' for one @local-host row
 set -g @tmmx_popup_width '60%'
 set -g @tmmx_popup_height '50%'
 set -g @tmmx_auto_reconnect 'off'
+set -g @tmmx_reconnect_on_input 'on'        # hold a dropped frame on screen until you type
 set -g @tmmx_reconnect_delay 2
 set -g @tmmx_reconnect_max 60
 set -g @tmmx_server_alive_interval 5
@@ -86,30 +70,16 @@ set -g @tmmx_manager_host 'local-host'
 set -g @tmmx_host_colors 'personal-host=#a3be8c,work-host=#ff9e64'
 ```
 
-tmmx turns on tmux's `extended-keys` option so that chords such as `Ctrl-Tab` arrive as distinct keys. The terminal must support extended key reporting; Alacritty, kitty, WezTerm, and iTerm2 do.
-
-`@tmmx_popup_width` and `@tmmx_popup_height` are read each time a picker opens, so changing them with `set -g` takes effect immediately. The other options are read when the plugin loads.
-
-The outer prefix is an additional tmux root binding. It opens the local prefix table in local sessions. In managed SSH wrappers it opens a table where the manager picker key is handled locally and every other key is forwarded to the remote tmux after the outer prefix.
-
-`@tmmx_auto_reconnect` retries a managed SSH connection after a network drop and uses an SSH keepalive (see below) so a half-open connection is detected. With `@tmmx_auto_restore` enabled, a recovered host with no tmux server is bootstrapped and its configured `@resurrect-restore-script-path` is invoked before tmmx reattaches. Restore is attempted once per outage and waits up to `@tmmx_restore_grace` seconds for the requested session. Reconnect attempts use capped exponential backoff — starting at `@tmmx_reconnect_delay` and doubling up to `@tmmx_reconnect_max` seconds — so a host that stays unreachable is retried slowly rather than hammered; any successful step resets the delay.
-
-After a tmux-resurrect restore, a managed remote wrapper comes back as a plain shell because resurrect does not re-run its ssh. tmmx reopens it: switching to such a wrapper reconnects it on the spot, straight to the remote session it was on (tmmx remembers each wrapper's last session under `~/.local/share/tmmx`, override with `TMMX_STATE_DIR`). With `@tmmx_auto_reconnect` on, restored wrappers are also reopened in the background after the restore, one at a time, without waiting for you to visit them.
-
-A live remote attach uses an SSH keepalive (`@tmmx_server_alive_interval` seconds, `@tmmx_server_alive_count` probes; ~15s of silence by default) to notice a truly dead link so it can reconnect, without dropping a healthy session on a brief stall. Reconnect attempts back off from `@tmmx_reconnect_delay` up to `@tmmx_reconnect_max`. Each managed connection appends events to `~/.local/share/tmmx/logs/<host>.log` (override the directory with `TMMX_STATE_DIR`).
-
-Automatic reconnect and restore are reliable only when SSH authentication is non-interactive: an agent-loaded key, an unprotected key, or a key whose passphrase is already cached. This applies equally to `@host` and `ssh user@host` targets, and the key can come from the host's `Host` entry. A password or passphrase prompt during a reconnect attempt blocks the wrapper until it is answered.
-
-`@tmmx_host_colors` keys can be a host alias or a complete `user@host` destination. A `user@host` entry matches only that destination, and a host alias also colors every `user@host` destination for that host.
-
-`@tmmx_picker_spacing` controls the minimum number of spaces between the label and timestamp columns.
+- **Keys** — tmmx enables tmux `extended-keys` so chords like `Ctrl-Tab` arrive distinctly; needs a terminal that supports it (Alacritty, kitty, WezTerm, iTerm2). The outer prefix opens the local prefix table locally, or the forwarding table inside a remote wrapper.
+- **Reconnect** — `@tmmx_auto_reconnect` retries a dropped SSH connection with capped exponential backoff (`@tmmx_reconnect_delay`→`@tmmx_reconnect_max`), using an SSH keepalive (`@tmmx_server_alive_interval` × `@tmmx_server_alive_count`, ~15s) to detect a dead link without dropping a healthy one. With `@tmmx_reconnect_on_input` on, a dropped session's last frame stays on screen until you press a key.
+- **Restore** — with `@tmmx_auto_restore`, a recovered host with no tmux server is bootstrapped and its `@resurrect-restore-script-path` run (once per outage, waiting up to `@tmmx_restore_grace`s). After a resurrect restore, remote wrappers reopen on the session they were on; with auto-reconnect on, in the background too. State and per-host logs live under `~/.local/share/tmmx` (`TMMX_STATE_DIR` to override).
+- **Colors** — `@tmmx_host_colors` keys are a host alias or a full `user@host`; an alias colors every `user@host` destination for that host.
 
 ## Notes
 
-- tmux normalizes `.` and `:` in session names to `_`; tmmx follows that rule.
-- New session names containing tabs or `|` are rejected because they cannot be represented safely in picker entries.
-- Set `TMMX_REMOTE_TMUX` in tmux’s server environment when a remote host needs an explicit tmux binary path.
+- tmux normalizes `.`/`:` to `_` in session names; tmmx follows suit. Names with tabs or `|` are rejected.
+- Set `TMMX_REMOTE_TMUX` in tmux's server environment when a remote host needs an explicit tmux path.
 
 ## Development
 
-Run the fast shell checks with `make test`. `make test-e2e` builds disposable Docker containers containing a real SSH server and tmux server, then verifies fresh-host creation and noisy remote shell output handling. Docker Compose is required for the E2E suite.
+`make test` runs the shell checks. `make test-e2e` spins up disposable Docker containers (real SSH + tmux) to verify fresh-host creation and noisy remote output; Docker Compose required.
