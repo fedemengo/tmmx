@@ -14,20 +14,24 @@ windows that print live-looking output, so pickers and panes look alive.
 ## Run it
 
 ```sh
-demo/up.sh        # build + start the 4 hosts, generate a key, write ssh snippet
-# add `Include ~/.ssh/tmmx-demo.config` to the top of ~/.ssh/config (once)
-tmmx              # then: manager key -> type @ -> the four hosts appear
-demo/down.sh      # stop everything, remove the ssh snippet
+demo/up.sh        # build + start the 4 hosts and generate a key
+demo/record.sh    # launch an ISOLATED tmmx that shows only the demo hosts
+demo/down.sh      # stop everything, remove the sandbox
 ```
 
 Requires Docker (daemon running) and Docker Compose. The hosts are throwaway;
-`down.sh` removes the containers, volumes, and the ssh snippet.
+`down.sh` removes the containers, volumes, and the recording sandbox.
+
+`record.sh` runs tmmx in a sandbox — a separate tmux socket (so none of your real
+local sessions show), a separate `$HOME`/`~/.ssh/config` listing only the demo
+hosts (so `@` lists only `web/api/db/worker`), and a separate state dir. **Your
+real tmux and `~/.ssh` are never touched.** Detach/exit as usual when done.
 
 Edit `host/seed.sh` to change the sessions/windows, or `compose.yaml` to add hosts.
 
 ## Suggested walkthrough (~25s)
 
-1. `tmmx`, then the manager key (`Ctrl-\ w`) and type `@` — the four hosts list.
+1. `demo/record.sh`, then the manager key (`Ctrl-\ w`) and type `@` — the four hosts list.
 2. Connect to **api** — its session picker appears; press `1` to quick-select `server` and watch the request log scroll.
 3. `Ctrl-` 3` — switch across to another host's session.
 4. `Ctrl-\ w` again — hop to **db** and quick-select `monitor`.
