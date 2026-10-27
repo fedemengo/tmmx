@@ -46,39 +46,7 @@ Automatic reconnect and restore work only with non-interactive SSH auth (an agen
 
 ## Configuration
 
-Set before TPM loads tmmx (popup size is re-read each time a picker opens; the rest at load):
-
-```tmux
-set -g @tmmx_outer_prefix 'C-\'
-set -g @tmmx_manager_key 'C-q'
-set -g @tmmx_picker_key 'f'
-set -g @tmmx_manager_picker_key 'w'
-set -g @tmmx_previous_key 'C-Tab'
-set -g @tmmx_nav_key 'C-`'
-set -g @tmmx_manager_local_sessions 'all'   # or 'host' for one @local-host row
-set -g @tmmx_popup_width '60%'
-set -g @tmmx_popup_height '50%'
-set -g @tmmx_auto_reconnect 'off'
-set -g @tmmx_reconnect_on_input 'on'        # hold a dropped frame on screen until you type
-set -g @tmmx_reconnect_delay 2
-set -g @tmmx_reconnect_max 60
-set -g @tmmx_server_alive_interval 5
-set -g @tmmx_server_alive_count 3
-set -g @tmmx_auto_restore 'off'
-set -g @tmmx_restore_grace 5
-set -g @tmmx_manager_host 'local-host'
-set -g @tmmx_host_colors 'personal-host=#a3be8c,work-host=#ff9e64'
-```
-
-- **Keys** — tmmx enables tmux `extended-keys` so chords like `Ctrl-Tab` arrive distinctly; needs a terminal that supports it (Alacritty, kitty, WezTerm, iTerm2). The outer prefix opens the local prefix table locally, or the forwarding table inside a remote wrapper.
-- **Reconnect** — `@tmmx_auto_reconnect` retries a dropped SSH connection with capped exponential backoff (`@tmmx_reconnect_delay`→`@tmmx_reconnect_max`), using an SSH keepalive (`@tmmx_server_alive_interval` × `@tmmx_server_alive_count`, ~15s) to detect a dead link without dropping a healthy one. With `@tmmx_reconnect_on_input` on, a dropped session's last frame stays on screen until you press a key.
-- **Restore** — with `@tmmx_auto_restore`, a recovered host with no tmux server is bootstrapped and its `@resurrect-restore-script-path` run (once per outage, waiting up to `@tmmx_restore_grace`s). After a resurrect restore, remote wrappers reopen on the session they were on; with auto-reconnect on, in the background too. State and per-host logs live under `~/.local/share/tmmx` (`TMMX_STATE_DIR` to override).
-- **Colors** — `@tmmx_host_colors` keys are a host alias or a full `user@host`; an alias colors every `user@host` destination for that host.
-
-## Notes
-
-- tmux normalizes `.`/`:` to `_` in session names; tmmx follows suit. Names with tabs or `|` are rejected.
-- Set `TMMX_REMOTE_TMUX` in tmux's server environment when a remote host needs an explicit tmux path.
+Keybindings, popup size, auto-reconnect, restore, and host colors are all tunable with `@tmmx_*` options. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full list and defaults.
 
 ## Development
 
