@@ -1,0 +1,5 @@
+# demo: generated ssh key and recordings
+demo/.keys/
+demo/*.gif
+demo/*.cast
+demo/*.mov
