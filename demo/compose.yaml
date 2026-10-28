@@ -7,7 +7,9 @@ services:
     hostname: web
     environment: { DEMO_ROLE: web }
     ports: ["2201:22"]
-    volumes: ["${TMMX_DEMO_KEYS_DIR}:/keys:ro"]
+    volumes:
+      - ${TMMX_DEMO_KEYS_DIR}:/keys:ro
+      - ../:/opt/tmmx:ro
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 22"]
       interval: 1s
@@ -19,7 +21,9 @@ services:
     hostname: api
     environment: { DEMO_ROLE: api }
     ports: ["2202:22"]
-    volumes: ["${TMMX_DEMO_KEYS_DIR}:/keys:ro"]
+    volumes:
+      - ${TMMX_DEMO_KEYS_DIR}:/keys:ro
+      - ../:/opt/tmmx:ro
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 22"]
       interval: 1s
@@ -31,7 +35,9 @@ services:
     hostname: db
     environment: { DEMO_ROLE: db }
     ports: ["2203:22"]
-    volumes: ["${TMMX_DEMO_KEYS_DIR}:/keys:ro"]
+    volumes:
+      - ${TMMX_DEMO_KEYS_DIR}:/keys:ro
+      - ../:/opt/tmmx:ro
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 22"]
       interval: 1s
@@ -43,7 +49,9 @@ services:
     hostname: worker
     environment: { DEMO_ROLE: worker }
     ports: ["2204:22"]
-    volumes: ["${TMMX_DEMO_KEYS_DIR}:/keys:ro"]
+    volumes:
+      - ${TMMX_DEMO_KEYS_DIR}:/keys:ro
+      - ../:/opt/tmmx:ro
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 22"]
       interval: 1s

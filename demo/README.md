@@ -1,15 +1,16 @@
 # tmmx demo
 
 Spins up four fake remote hosts (real sshd + tmux in Docker) so you can record
-tmmx connecting across machines. Each host is pre-seeded with sessions and
-windows that print live-looking output, so pickers and panes look alive.
+tmmx connecting across machines. Each host runs **tmmx + the minova theme** and is
+pre-seeded with sessions whose windows print live-looking output, so the pickers,
+status bars, and panes all look alive — this is what `demo/tmmx.gif` was made from.
 
-| Host (`@`) | Port | Sessions (3 each, 2 windows) |
-|------------|------|------------------------------|
-| web    | 2201 | `nginx`, `deploy`, `shell` |
-| api    | 2202 | `server`, `logs`, `repl` |
-| db     | 2203 | `psql`, `backup`, `monitor` |
-| worker | 2204 | `queue`, `cron`, `shell` |
+| Host (`@`) | Port | Sessions (3 each, 2 live windows) |
+|------------|------|-----------------------------------|
+| web    | 2201 | `deploy`, `nginx`, `shell` |
+| api    | 2202 | `logs`, `repl`, `server` |
+| db     | 2203 | `backup`, `monitor`, `psql` |
+| worker | 2204 | `cron`, `queue`, `shell` |
 
 ## Run it
 
@@ -29,13 +30,15 @@ real tmux and `~/.ssh` are never touched.** Detach/exit as usual when done.
 
 Edit `host/seed.sh` to change the sessions/windows, or `compose.yaml` to add hosts.
 
-## Suggested walkthrough (~25s)
+## Walkthrough (what the GIF shows)
 
-1. `demo/record.sh`, then the manager key (`Ctrl-\ w`) and type `@` — the four hosts list.
-2. Connect to **api** — its session picker appears; press `1` to quick-select `server` and watch the request log scroll.
-3. `Ctrl-` 3` — switch across to another host's session.
-4. `Ctrl-\ w` again — hop to **db** and quick-select `monitor`.
-5. End on the manager showing the connected hosts.
+For each host in turn (`web → api → db → worker`):
+
+1. `Ctrl-\ w`, type `@<host>`, Enter — connect; the host's session picker appears, press `1` to quick-select a session.
+2. `Ctrl-\ n` — switch to that session's **second window** (forwarded to the host's tmux).
+3. `Ctrl-\ e` — open the **host's own tmmx session picker** (forwarded through the wrapper), press `1` for a second session.
+
+Then `Ctrl-\ w` again to hop to the next host, and end on the manager showing the whole fleet.
 
 ## Recording
 
@@ -57,6 +60,5 @@ containers are only the remote hosts. Pick one:
 - **Scripted (vhs).** `vhs` gives a reproducible GIF but has no key overlay and
   is awkward with `Ctrl-\`/`Ctrl-`` chords, so it's not included here.
 
-Installing tmmx (and fzf) on the demo hosts additionally enables the forwarded
-per-host pickers (`Ctrl-\ f`, `Ctrl-` 2`) to render on the host; the local
-manager flow above works without it.
+The hosts already run tmmx + fzf, so the forwarded per-host pickers (`Ctrl-\ e`)
+and nav render on the host — that's the full remote experience shown in the GIF.

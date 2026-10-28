@@ -2,6 +2,10 @@
 
 `tmmx` (**t**mux **m**ulti-**m**achine mu**x**er) is a host-aware tmux session manager: one local tmux server that switches between local workspaces and SSH-backed remote tmux sessions.
 
+![tmmx demo](demo/tmmx.gif)
+
+*One local tmux hopping across four SSH hosts — picking sessions and windows on each, all from the manager. Spin up the same throwaway fleet yourself with [`demo/`](demo/).*
+
 ## Requirements
 
 tmux 3.2+, fzf 0.36+ (locally and on each remote host where you use the picker), and SSH access to your remote hosts.

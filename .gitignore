@@ -1,6 +1,9 @@
 # demo: generated ssh key and recordings
 demo/.keys/
 demo/*.gif
+!demo/tmmx.gif
 demo/*.cast
 demo/*.mov
 demo/.sandbox/
+demo/.theme/
+.DS_Store
