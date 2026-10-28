@@ -4,7 +4,7 @@
 
 ![tmmx demo](demo/tmmx.gif)
 
-*One local tmux hopping across four SSH hosts — picking sessions and windows on each, all from the manager. Spin up the same throwaway fleet yourself with [`demo/`](demo/).*
+*Switch between tmux sessions across hosts and within a host — each host keeps its own sessions and windows, all reachable from one local tmux. Build this throwaway fleet yourself with [`demo/`](demo/).*
 
 ## Requirements
 
