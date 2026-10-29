@@ -34,7 +34,9 @@ awk -F '\t' -v now="$now" -v columns="$columns" '
       else timestamp="\033[38;2;76;86;106m" (timestamps[i] != "" ? timestamps[i] : "never") "\033[0m"
       label=labels[i]; label_width=widths[i]
       if (columns > 2) {
-        available=columns-8-length(timestamps[i])
+        # Reserve 2 columns for the leading quick-select number field (one digit
+        # plus its tab separator) so it does not push the timestamp off the edge.
+        available=columns-8-2-length(timestamps[i])
         if (available < 1) { label=""; label_width=0; gap=0 }
         else {
           label_limit=available-1
@@ -44,7 +46,7 @@ awk -F '\t' -v now="$now" -v columns="$columns" '
       } else gap=max_width+2-label_width
       # Leading number column (1-9) is a quick-select hint only — kept in its own
       # field so it never pollutes the label, completion (Tab), or target.
-      num=(i <= 9 ? i : "")
+      num=(i <= 9 ? i : " ")
       printf "%s\t%s%*s\t%s\t%s\n", num, label, gap, "", timestamp, targets[i]
     }
   }

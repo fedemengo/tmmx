@@ -33,14 +33,23 @@ expected_manager_no_local=$(printf '@target-host\t30\ttime-30\tremote-wrapper\nd
 [ "$(tmmx_selection "$(printf 'query\n1\tlabel\ttime\ttarget')")" = target ]
 ansi_escape=$(printf '\033')
 formatted=$(printf 'short\t100\ttime-1\ttarget-1\nlonger\t1\ttime-2\ttarget-2\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=30 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
-expected_formatted=$(printf '1\t%-16s\ttime-1\ttarget-1\n2\t%-16s\ttime-2\ttarget-2' short longer)
+expected_formatted=$(printf '1\t%-14s\ttime-1\ttarget-1\n2\t%-14s\ttime-2\ttarget-2' short longer)
 [ "$formatted" = "$expected_formatted" ]
 
 formatted_narrow=$(printf 'short\t100\ttime-1\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=15 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
-[ "$formatted_narrow" = "$(printf '1\t \ttime-1\ttarget-1')" ]
+[ "$formatted_narrow" = "$(printf '1\t\ttime-1\ttarget-1')" ]
 
 formatted_tiny=$(printf 'long-session\t100\t2026-08-31 14:54\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=20 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
 [ "$formatted_tiny" = "$(printf '1\t\t2026-08-31 14:54\ttarget-1')" ]
+
+# The quick-select number column must not push the last-used date off the right
+# edge: the visible part (number + label + timestamp, tabs as one column) must fit
+# the picker width, and the full date must survive.
+date_cols=40
+date_line=$(printf 'session-name\t100\t2026-10-28 00:19\ttarget\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=$date_cols "$TMMX_TEST_ROOT/scripts/format-picker.sh")
+date_visible=$(printf '%s' "$date_line" | cut -f1-3 | sed "s/${ansi_escape}\\[[0-9;]*m//g" | tr '\t' ' ')
+[ "${#date_visible}" -le "$((date_cols - 6))" ]
+case "$date_visible" in *"2026-10-28 00:19"*) ;; *) printf 'FAIL: last-used date truncated: [%s]\n' "$date_visible" >&2; exit 1 ;; esac
 
 [ "$(tmmx_remote_session_name legion3)" = __tmmx_remote__legion3 ]
 [ "$(tmmx_remote_session_name fmengozzi@legion3)" = __tmmx_remote__fmengozzi@legion3 ]
@@ -119,7 +128,7 @@ rm -rf "$config_dir"
 
 # Rows without a timestamp show their text instead of never.
 formatted_text=$(printf '@alpha\t0\tssh config\tssh:alpha\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=40 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
-[ "$formatted_text" = "$(printf '1\t%-22s\tssh config\tssh:alpha' @alpha)" ]
+[ "$formatted_text" = "$(printf '1\t%-20s\tssh config\tssh:alpha' @alpha)" ]
 
 # Labels: @host for alias targets, user@host for explicit users. Colors match the
 # full destination first and fall back to the host part.
