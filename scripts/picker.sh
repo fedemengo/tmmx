@@ -2,7 +2,7 @@
 
 . "$TMMX_DIR/scripts/common.sh"
 current_session=$(tmux display-message -p '#{session_name}')
-result=$(tmmx_list_host_sessions "$current_session" | tmmx_fzf local "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/kill-session.sh' {3}" || true)
+result=$(tmmx_list_host_sessions "$current_session" | tmmx_fzf local "TMMX_DIR='$TMMX_DIR' sh '$TMMX_DIR/scripts/kill-session.sh' {4}" || true)
 query=$(tmmx_query "$result")
 selected=$(tmmx_selection "$result")
 

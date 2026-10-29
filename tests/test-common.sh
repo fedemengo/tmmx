@@ -30,17 +30,17 @@ actual_manager_no_local=$(tmmx_list_manager_sessions '' plink none)
 expected_manager_no_local=$(printf '@target-host\t30\ttime-30\tremote-wrapper\ndeploy@target-host\t25\ttime-25\tremote-deploy')
 [ "$actual_manager_no_local" = "$expected_manager_no_local" ]
 
-[ "$(tmmx_selection "$(printf 'query\nlabel\ttime\ttarget')")" = target ]
+[ "$(tmmx_selection "$(printf 'query\n1\tlabel\ttime\ttarget')")" = target ]
 ansi_escape=$(printf '\033')
 formatted=$(printf 'short\t100\ttime-1\ttarget-1\nlonger\t1\ttime-2\ttarget-2\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=30 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
-expected_formatted=$(printf '%-16s\ttime-1\ttarget-1\n%-16s\ttime-2\ttarget-2' '1 short' '2 longer')
+expected_formatted=$(printf '1\t%-16s\ttime-1\ttarget-1\n2\t%-16s\ttime-2\ttarget-2' short longer)
 [ "$formatted" = "$expected_formatted" ]
 
 formatted_narrow=$(printf 'short\t100\ttime-1\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=15 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
-[ "$formatted_narrow" = "$(printf ' \ttime-1\ttarget-1')" ]
+[ "$formatted_narrow" = "$(printf '1\t \ttime-1\ttarget-1')" ]
 
 formatted_tiny=$(printf 'long-session\t100\t2026-08-31 14:54\ttarget-1\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=20 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
-[ "$formatted_tiny" = "$(printf '\t2026-08-31 14:54\ttarget-1')" ]
+[ "$formatted_tiny" = "$(printf '1\t\t2026-08-31 14:54\ttarget-1')" ]
 
 [ "$(tmmx_remote_session_name legion3)" = __tmmx_remote__legion3 ]
 [ "$(tmmx_remote_session_name fmengozzi@legion3)" = __tmmx_remote__fmengozzi@legion3 ]
@@ -115,11 +115,11 @@ ops_rows=$(printf 'ops@alpha\t0\tssh config\tssh:ops@alpha\nops@beta\t0\tssh con
 [ "$(tmmx_list_manager_candidates '' plink all 'ops@')" = "$(printf '%s\n%s' "$expected_manager" "$ops_rows")" ]
 [ "$(tmmx_list_manager_candidates '' plink all 'bad user@')" = "$expected_manager" ]
 rm -rf "$config_dir"
-[ "$(tmmx_selection "$(printf 'query\nlabel\tssh config\tssh:deploy@alpha')")" = ssh:deploy@alpha ]
+[ "$(tmmx_selection "$(printf 'query\n1\tlabel\tssh config\tssh:deploy@alpha')")" = ssh:deploy@alpha ]
 
 # Rows without a timestamp show their text instead of never.
 formatted_text=$(printf '@alpha\t0\tssh config\tssh:alpha\n' | TMMX_NOW=100 TMMX_PICKER_COLUMNS=40 "$TMMX_TEST_ROOT/scripts/format-picker.sh" | sed "s/${ansi_escape}\\[[0-9;]*m//g")
-[ "$formatted_text" = "$(printf '%-22s\tssh config\tssh:alpha' '1 @alpha')" ]
+[ "$formatted_text" = "$(printf '1\t%-22s\tssh config\tssh:alpha' @alpha)" ]
 
 # Labels: @host for alias targets, user@host for explicit users. Colors match the
 # full destination first and fall back to the host part.

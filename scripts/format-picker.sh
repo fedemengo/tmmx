@@ -32,8 +32,7 @@ awk -F '\t' -v now="$now" -v columns="$columns" '
     for (i=1; i<=NR; i++) {
       if (epochs[i] > 0) { timestamp=colour(ages[i]) timestamps[i] "\033[0m" }
       else timestamp="\033[38;2;76;86;106m" (timestamps[i] != "" ? timestamps[i] : "never") "\033[0m"
-      prefix=(i <= 9 ? i " " : "  ")
-      label=prefix labels[i]; label_width=widths[i]+2
+      label=labels[i]; label_width=widths[i]
       if (columns > 2) {
         available=columns-8-length(timestamps[i])
         if (available < 1) { label=""; label_width=0; gap=0 }
@@ -43,7 +42,10 @@ awk -F '\t' -v now="$now" -v columns="$columns" '
           gap=available-label_width
         }
       } else gap=max_width+2-label_width
-      printf "%s%*s\t%s\t%s\n", label, gap, "", timestamp, targets[i]
+      # Leading number column (1-9) is a quick-select hint only — kept in its own
+      # field so it never pollutes the label, completion (Tab), or target.
+      num=(i <= 9 ? i : "")
+      printf "%s\t%s%*s\t%s\t%s\n", num, label, gap, "", timestamp, targets[i]
     }
   }
 '

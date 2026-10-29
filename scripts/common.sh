@@ -208,14 +208,14 @@ tmmx_run_fzf() {
     digit_binding="$digit_binding,$d:$action+accept"
     d=$((d + 1))
   done
-  fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2 --tabstop=1 --print-query \
+  fzf --ansi --height=100% --reverse --border=rounded --padding=0 --no-scrollbar --prompt='> ' --delimiter='\t' --with-nth=1,2,3 --nth=2,3 --tabstop=1 --print-query \
     --bind "j:down,k:up,g:first,G:last,ctrl-d:half-page-down,ctrl-u:half-page-up,ctrl-f:page-down,ctrl-b:page-up,enter:accept$kill_binding$reload_binding$start_binding$digit_binding" \
-    --bind "tab:transform-query(printf %s {1} | sed 's/[[:space:]]*\$//')" \
+    --bind "tab:transform-query(printf %s {2} | sed 's/[[:space:]]*\$//')" \
     --bind "i:$insert_mode" --bind "a:$insert_mode" --bind "@:$insert_mode+put(@)" --bind "ctrl-j:$scroll_mode" --bind 'space:ignore' "$@"
 }
 
 tmmx_query() { printf '%s\n' "$1" | sed -n '1p'; }
-tmmx_selection() { printf '%s\n' "$1" | sed -n '2p' | cut -f3-; }
+tmmx_selection() { printf '%s\n' "$1" | sed -n '2p' | cut -f4-; }
 tmmx_has_session() { tmux has-session -t "=$1" 2>/dev/null; }
 tmmx_tag_managed() { tmux set-option -t "=$1:" @tmmx_managed 1; }
 tmmx_session_name() { printf '%s\n' "$(printf '%s' "$1" | tr '.:' '__')"; }
